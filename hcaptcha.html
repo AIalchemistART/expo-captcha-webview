@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <title>hCaptcha Test</title>
     <script src="[https://js.hcaptcha.com/1/api.js"](https://js.hcaptcha.com/1/api.js") async defer></script>
+    <style>
+      body { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f9f9f9; }
+      .h-captcha { border: 2px dashed #333; min-height: 80px; min-width: 300px; }
+    </style>
   </head>
   <body>
     <div class="h-captcha" data-sitekey="10000000-ffff-ffff-ffff-000000000001" data-callback="onVerify"></div>
