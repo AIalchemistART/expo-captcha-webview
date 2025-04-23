@@ -19,10 +19,32 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.aialchemist.mysticalbiblecompanion"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "sentry-expo",
+      "expo-secure-store",
+      [
+        "react-native-iap",
+        {
+          "playBillingClientVersion": "6.1.0"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "93595a6a-8986-4a88-9fd0-b75217451212"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/93595a6a-8986-4a88-9fd0-b75217451212"
     }
   }
 }
