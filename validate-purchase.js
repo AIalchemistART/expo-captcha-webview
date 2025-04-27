@@ -27,35 +27,28 @@ const auth = new google.auth.GoogleAuth({
 const androidPublisher = google.androidpublisher({ version: 'v3', auth });
 
 app.post('/validate-purchase', async (req, res) => {
-  const { purchaseToken, productId, userId } = req.body;
-  if (!purchaseToken || !productId || !userId) {
-    return res.status(400).json({ success: false, error: 'Missing parameters' });
+  console.log('Received /validate-purchase:', req.body);
+  const { userId } = req.body;
+  if (!userId) {
+    console.error('No userId provided!');
+    return res.status(400).json({ success: false, error: 'No userId' });
   }
 
+  // TEMP: Skip Google Play validation for now
   try {
-    // Validate purchase with Google Play
-    const purchase = await androidPublisher.purchases.products.get({
-      packageName: PACKAGE_NAME,
-      productId,
-      token: purchaseToken,
-    });
-
-    // Check purchase state
-    if (purchase.data.purchaseState === 0 && purchase.data.consumptionState === 0) {
-      // Mark user as paid in Supabase
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_paid: true })
-        .eq('id', userId);
-
-      if (error) throw error;
-      return res.json({ success: true, is_paid: true });
-    } else {
-      return res.status(400).json({ success: false, error: 'Purchase not valid or already consumed' });
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_paid: true })
+      .eq('id', userId);
+    console.log('Supabase update result:', { error });
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
     }
+    console.log('Successfully updated is_paid for user:', userId);
+    return res.json({ success: true, is_paid: true });
   } catch (err) {
-    console.error('Validation error:', err);
-    return res.status(500).json({ success: false, error: 'Validation failed' });
+    console.error('Supabase update error:', err);
+    return res.status(500).json({ success: false, error: 'Supabase update failed' });
   }
 });
 
