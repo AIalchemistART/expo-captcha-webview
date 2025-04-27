@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>reCAPTCHA Test</title>
+    <script src="[https://www.google.com/recaptcha/api.js"](https://www.google.com/recaptcha/api.js") async defer></script>
+    <style>
+      body { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f9f9f9; }
+      .g-recaptcha { border: 2px dashed #333; min-height: 80px; min-width: 300px; }
+    </style>
+  </head>
+  <body>
+    <div class="g-recaptcha" data-sitekey="1f3a393c-a226-4c4c-9de6-1e9682d0b9a2" data-callback="onVerify"></div>
+    <script>
+      function onVerify(token) {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage('captcha-token:' + token);
+        } else {
+          document.body.innerHTML += '<p>Token: ' + token + '</p>';
+        }
+      }
+    </script>
+  </body>
+</html>
