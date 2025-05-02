@@ -5,7 +5,7 @@ import { supabase } from '../services/supabaseClient';
 
 import { useAuth } from './useAuth';
 
-export default function LogoutButton() {
+export default function LogoutButton({ navigation }) {
   const { setUser } = useAuth();
   const handleLogout = async () => {
     try {
@@ -15,6 +15,9 @@ export default function LogoutButton() {
         // Optionally, show a UI error message here
       }
       setUser(null); // Clear user context
+      if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate('Login');
+      }
     } catch (e) {
       console.error('Unexpected logout error:', e);
     }

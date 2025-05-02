@@ -68,12 +68,12 @@ if (fs.existsSync(structurePath)) {
       }
     }
     if (!mismatch) {
-      console.log('\nNo mismatches found! Your bibleStructure.js matches web_bible.json.');
+      // console.log('\nNo mismatches found! Your bibleStructure.js matches web_bible.json.');
     } else {
-      console.log('\nSee warnings above for mismatches.');
+      // console.log('\nSee warnings above for mismatches.');
     }
   }
 }
 
 // Optionally, write new structure to file (uncomment to auto-update)
-fs.writeFileSync(structurePath, structureJS, 'utf-8');
+// fs.writeFileSync(structurePath, structureJS, 'utf-8');

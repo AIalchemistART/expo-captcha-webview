@@ -9,13 +9,19 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BACKEND_API_URL": "https://mbc-backend-quj9.onrender.com"
+      }
     },
     "production": {
       "autoIncrement": true,
       "channel": "build001",
       "android": {
         "image": "sdk-52"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_API_URL": "https://mbc-backend-quj9.onrender.com"
       }
     }
   },

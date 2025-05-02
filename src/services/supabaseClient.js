@@ -6,8 +6,8 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 // --- Robust logging for Supabase config ---
-console.log('[Supabase Config] URL:', supabaseUrl);
-console.log('[Supabase Config] Anon Key present:', !!supabaseAnonKey);
+// console.log('[Supabase Config] URL:', supabaseUrl);
+// console.log('[Supabase Config] Anon Key present:', !!supabaseAnonKey);
 
 
 if (!supabaseUrl || !supabaseAnonKey) {

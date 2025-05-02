@@ -6,6 +6,10 @@ import * as FileSystem from 'expo-file-system';
 const COMMENTARY_FILE = FileSystem.documentDirectory + 'localCommentaries.json';
 
 export default function DevCommentarySync() {
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+    // Hide tool in production
+    return null;
+  }
   const [commentaries, setCommentaries] = useState(null);
   const [status, setStatus] = useState('');
 

@@ -34,35 +34,46 @@ export default function CustomPickerModal({
           <VignetteBackground borderRadius={18} />
           <ScrollWornEdges style={{ position: 'absolute', left: 20, top: 0, width: '100%', height: '100%', zIndex: 0 }} width={320} height={610} />
           <Text style={styles.title}>{title}</Text>
-          <ScrollView style={styles.optionsList}>
-            {options.map((opt, idx) => (
-              <TouchableOpacity
-                key={opt.value ?? opt.label ?? idx}
-                style={[
-                  styles.option,
-                  selectedValue === opt.value && styles.selectedOption,
-                  opt.enabled === false && styles.disabledOption,
-                ]}
-                onPress={() => {
-                  if (opt.enabled === false) return;
-                  onValueChange(opt.value);
-                  onRequestClose();
-                }}
-                disabled={opt.enabled === false}
-                accessibilityLabel={opt.label}
-                activeOpacity={0.75}
-              >
-                <Text
+           <ScrollView style={styles.optionsList}>
+            {options.map((opt, idx) => {
+              if (opt.type === 'label') {
+                // Section heading: styled, not interactive
+                return (
+                  <View key={opt.label + idx} style={styles.sectionHeadingContainer}>
+                    <Text style={styles.sectionHeading}>{opt.label}</Text>
+                  </View>
+                );
+              }
+              // Book row: interactive
+              return (
+                <TouchableOpacity
+                  key={opt.value ?? opt.label ?? idx}
                   style={[
-                    styles.optionLabel,
-                    selectedValue === opt.value && styles.selectedOptionLabel,
-                    opt.enabled === false && styles.disabledOptionLabel,
+                    styles.option,
+                    selectedValue === opt.value && styles.selectedOption,
+                    opt.enabled === false && styles.disabledOption,
                   ]}
+                  onPress={() => {
+                    if (opt.enabled === false) return;
+                    onValueChange(opt.value);
+                    onRequestClose();
+                  }}
+                  disabled={opt.enabled === false}
+                  accessibilityLabel={opt.label}
+                  activeOpacity={0.75}
                 >
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      selectedValue === opt.value && styles.selectedOptionLabel,
+                      opt.enabled === false && styles.disabledOptionLabel,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
           <TouchableOpacity
             style={styles.closeButton}
@@ -156,5 +167,27 @@ const styles = StyleSheet.create({
     textShadowColor: '#bfae66',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
+  },
+  sectionHeadingContainer: {
+    paddingTop: 14,
+    paddingBottom: 4,
+    backgroundColor: 'transparent',
+    alignSelf: 'stretch',
+    alignItems: 'center', // Center horizontally
+    justifyContent: 'center',
+  },
+  sectionHeading: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#2A004B', // Deep purple for high contrast
+    backgroundColor: 'rgba(255,215,0,0.25)', // Gold highlight background at 25% opacity
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    textAlign: 'center', // Center text
+    letterSpacing: 0.5,
+    marginLeft: 0,
+    marginBottom: 4,
+    marginTop: 6,
+    fontFamily: 'serif',
   },
 });

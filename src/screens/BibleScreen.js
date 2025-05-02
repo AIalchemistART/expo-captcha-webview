@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, Text, StyleSheet, View, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Button, UIManager, findNodeHandle } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView, Text, StyleSheet, View, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Button, UIManager, findNodeHandle, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import VignetteBackground from '../components/VignetteBackground';
 import ScrollWornEdgesCommentary from '../components/ScrollWornEdgesCommentary';
 import MysticalHomeBackground from '../components/MysticalHomeBackground';
@@ -14,11 +16,17 @@ import { useCommentary } from '../hooks/useCommentary';
 import { BIBLE_STRUCTURE } from '../utils/bibleStructure';
 
 import { getVerse, getChapter } from '../utils/bibleText';
+import BookmarkToggle from '../components/BookmarkToggle';
+import BookmarkPremiumOverlay from '../components/BookmarkPremiumOverlay';
+import MysticalAuthGate from '../components/MysticalAuthGate';
+import { useAuth } from '../auth/useAuth';
+import BibleIntroOverlay from '../components/BibleIntroOverlay';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Debug log: Check Psalms 150 verse count from static structure
-console.log('Psalms 150 verse count (should be 6):', BIBLE_STRUCTURE['Psalms'].verses[149]);
-console.log('BibleScreen.js: Psalms last 5 values:', BIBLE_STRUCTURE['Psalms'].verses.slice(-5));
-console.log('BibleScreen.js: Psalms verses length:', BIBLE_STRUCTURE['Psalms'].verses.length);
+// console.log('Psalms 150 verse count (should be 6):', BIBLE_STRUCTURE['Psalms'].verses[149]);
+// console.log('BibleScreen.js: Psalms last 5 values:', BIBLE_STRUCTURE['Psalms'].verses.slice(-5));
+// console.log('BibleScreen.js: Psalms verses length:', BIBLE_STRUCTURE['Psalms'].verses.length);
 
 // Canonical and Apocryphal/Deuterocanonical book order for dropdown
 const CANONICAL_BOOKS = [
@@ -71,9 +79,33 @@ const BOOKS = [
 
 
 const BibleScreen = ({ navigation }) => {
+  const { user } = useAuth();
+  // Add profile context for premium gating
+  const { profile } = require('../auth/useProfile').useProfile();
+  const isPremium = !!profile?.is_paid;
+  const isLoggedIn = !!user;
+  // Overlay/modal state for upgrade info
+  const [showUpgradeOverlay, setShowUpgradeOverlay] = useState(false);
+  // Overlay for bookmark premium gating
+  const [showBookmarkPremiumOverlay, setShowBookmarkPremiumOverlay] = useState(false);
+  // Intro overlay state
+  const [showIntroOverlay, setShowIntroOverlay] = useState(false);
+
+  // --- Place these after book/chapter state is defined ---
+
+  // Show intro overlay on mount for unauthenticated or free users unless dismissed
+  useEffect(() => {
+    if (isPremium) return; // Never show for premium
+    AsyncStorage.getItem('mbc_bible_intro_dismissed_v1').then(val => {
+      if (val !== 'true') {
+        setShowIntroOverlay(true);
+      }
+    });
+  }, [isLoggedIn, isPremium]);
+
   // 🟢 BibleScreen mounted
   useEffect(() => {
-    console.log('🟢 [INTERNAL TEST 001][BibleScreen] Mounted');
+    // console.log('🟢 [INTERNAL TEST 001][BibleScreen] Mounted');
   }, []);
   // Modal and commentary state
   const [showCommentaryModal, setShowCommentaryModal] = useState(false);
@@ -84,6 +116,12 @@ const BibleScreen = ({ navigation }) => {
   const [showBookPickerModal, setShowBookPickerModal] = useState(false);
 
   const [chapter, setChapter] = useState(1);
+
+  // --- Now compute gating variables using current state ---
+  const isGenesis1 = (book === 'Genesis' && chapter === 1);
+  const isMatthew1 = (book === 'Matthew' && chapter === 1);
+  const isAllowedFree = isGenesis1 || isMatthew1;
+
   const [verse, setVerse] = useState(1);
   const [showChapterPickerModal, setShowChapterPickerModal] = useState(false);
   const [showVersePickerModal, setShowVersePickerModal] = useState(false);
@@ -116,17 +154,62 @@ const BibleScreen = ({ navigation }) => {
     verse: commentaryRequested ? verse : null,
     passageRange: commentaryRequested ? passageRange : null
   }, '\x1b[0m');
+  // Debug: log commentary gating logic
+  if (commentaryRequested) {
+    console.log('[DEBUG][GATE] commentaryRequested:', {
+      isLoggedIn,
+      isPremium,
+      isGenesis1,
+      isMatthew1,
+      isAllowedFree,
+      book,
+      chapter,
+      willFetch: (!isLoggedIn || isPremium || isAllowedFree)
+    });
+  }
   const {
     commentary,
     loading: commentaryLoading,
     error: commentaryError,
     refresh: refreshCommentary
   } = useCommentary(
-    commentaryRequested ? book : null,
-    commentaryRequested ? chapter : null,
-    commentaryRequested ? verse : null,
-    commentaryRequested ? passageRange : null
+    // Only allow commentary fetch if:
+    // - Not logged in (free/guest: can only get Genesis 1 & Matthew 1 anyway)
+    // - Premium
+    // - Or, non-premium but Genesis 1 or Matthew 1
+    commentaryRequested && (
+      !isLoggedIn || isPremium || isAllowedFree
+    ) ? book : null,
+    commentaryRequested && (
+      !isLoggedIn || isPremium || isAllowedFree
+    ) ? chapter : null,
+    commentaryRequested && (
+      !isLoggedIn || isPremium || isAllowedFree
+    ) ? verse : null,
+    commentaryRequested && (
+      !isLoggedIn || isPremium || isAllowedFree
+    ) ? passageRange : null
   );
+
+  // --- Dynamic verseBox sizing ---
+const { height: windowHeight } = useWindowDimensions();
+const insets = useSafeAreaInsets();
+const [pickerRowHeight, setPickerRowHeight] = useState(0);
+const [referenceHeight, setReferenceHeight] = useState(0);
+const [gmiButtonHeight, setGmiButtonHeight] = useState(0);
+
+const minHeight = 380;
+const staticMaxHeight = 605;
+// Subtract measured heights and insets from window height
+const available = windowHeight
+  - pickerRowHeight
+  - referenceHeight
+  - gmiButtonHeight
+  - (insets.top || 0)
+  - (insets.bottom || 0)
+  - 24; // Extra padding/margin fudge factor
+const maxHeight = Math.max(minHeight, Math.min(available, staticMaxHeight));
+// --- End dynamic verseBox sizing ---
 
   // Reset commentary state when modal closes or passage changes
   useEffect(() => {
@@ -144,7 +227,6 @@ const BibleScreen = ({ navigation }) => {
   const passageReference = selectedRange && selectedRange.start !== selectedRange.end
     ? `${book} ${chapter}:${Math.min(selectedRange.start, selectedRange.end)}–${Math.max(selectedRange.start, selectedRange.end)}`
     : `${book} ${chapter}:${verse}`;
-
 
   // Set default book to 'Genesis' (first book of Old Testament)
 
@@ -244,9 +326,9 @@ const BibleScreen = ({ navigation }) => {
 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { flex: 1 }]}>
       <MysticalHomeBackground />
-      <View style={styles.inlinePickerRow}>
+      <View style={styles.inlinePickerRow} onLayout={e => setPickerRowHeight(e.nativeEvent.layout.height)}>
         <View style={[styles.inlinePickerGroup, styles.bookPickerGroup]}>
           <Text style={styles.headingLabel}>Book</Text>
           <View style={styles.pickerWrapper}>
@@ -267,7 +349,7 @@ const BibleScreen = ({ navigation }) => {
               onRequestClose={() => setShowBookPickerModal(false)}
               options={BOOKS.map(item =>
                 item.type === 'label'
-                  ? { label: item.label, value: null, enabled: false }
+                  ? { label: item.label, value: null, type: 'label', enabled: false }
                   : { label: item, value: item }
               )} // Modal options remain full names
               selectedValue={book}
@@ -278,6 +360,26 @@ const BibleScreen = ({ navigation }) => {
                 }
               }}
               title="Select Book"
+              renderOption={opt =>
+                opt.type === 'label' ? (
+                  <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 14, paddingBottom: 4 }}>
+                    <Text style={{
+                      fontSize: 17,
+                      fontWeight: 'bold',
+                      color: '#2A004B',
+                      backgroundColor: 'rgba(255,215,0,0.25)',
+                      paddingHorizontal: 8,
+                      borderRadius: 6,
+                      textAlign: 'center',
+                      letterSpacing: 0.5,
+                      marginLeft: 0,
+                      marginBottom: 4,
+                      marginTop: 6,
+                      fontFamily: 'serif',
+                    }}>{opt.label}</Text>
+                  </View>
+                ) : undefined
+              }
             />
           </View>
 
@@ -344,14 +446,17 @@ const BibleScreen = ({ navigation }) => {
           </View>
         </View>
       </View>
-      <Text style={styles.referenceHeading}>
-        {book} {chapter}:{selectedRange && selectedRange.start !== selectedRange.end
-          ? `${Math.min(selectedRange.start, selectedRange.end)}–${Math.max(selectedRange.start, selectedRange.end)}`
-          : verse} <Text style={styles.translationHeading}>({translation})</Text>
-      </Text>
-      <View style={styles.verseBox}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+        <Text style={styles.referenceHeading} onLayout={e => setReferenceHeight(e.nativeEvent.layout.height)}>
+          {book} {chapter}:{selectedRange && selectedRange.start !== selectedRange.end
+            ? `${Math.min(selectedRange.start, selectedRange.end)}–${Math.max(selectedRange.start, selectedRange.end)}`
+            : verse} <Text style={styles.translationHeading}>({translation})</Text>
+        </Text>
+      </View>
+      <View style={[styles.verseBox, { maxHeight, minHeight, flexGrow: 1, marginBottom: gmiButtonHeight + 8 }] }>
+
         <VignetteBackground borderRadius={18} />
-        <ScrollView ref={scrollViewRef} style={{ flexGrow: 0, maxHeight: 560 }}>
+        <ScrollView ref={scrollViewRef} style={{ flex: 1 }}>
           {loading ? (
             <ActivityIndicator size="large" color="#4b3ca7" />
           ) : error ? (
@@ -430,22 +535,186 @@ const BibleScreen = ({ navigation }) => {
           )}
         </ScrollView>
       </View>
-      <View style={styles.commentaryBox}>
-        <MysticalButtonWithBackground
-          style={styles.mysticalButton}
-          onPress={() => {
-            setShowCommentaryModal(true);
-            setCommentaryRequested(true);
+      <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: insets.bottom || 0,
+            alignItems: 'center',
+            paddingBottom: (insets.bottom || 0) + 20,
+            zIndex: 99,
           }}
-        />
-      </View>
+          onLayout={e => {
+            setGmiButtonHeight(e.nativeEvent.layout.height);
+          }}
+        >
+          <MysticalButtonWithBackground
+            style={styles.mysticalButton}
+            onPress={() => {
+              console.log('[DEBUG][GATE] BUTTON_PRESS', {
+                isLoggedIn,
+                isPremium,
+                isGenesis1,
+                isMatthew1,
+                isAllowedFree,
+                book,
+                chapter,
+              });
+              if (isAllowedFree) {
+                console.log('[DEBUG][GATE] ALLOWED_FREE: Opening mystical commentary modal for Genesis 1 or Matthew 1');
+                setShowCommentaryModal(true);
+                setCommentaryRequested(true);
+              } else if (isLoggedIn && !isPremium) {
+                console.log('[DEBUG][GATE] SHOW_OVERLAY: User is non-premium and not in allowed free passage. Showing upgrade overlay.');
+                setShowUpgradeOverlay(true);
+              } else {
+                console.log('[DEBUG][GATE] DEFAULT: Premium user or guest. Opening mystical commentary modal.');
+                setShowCommentaryModal(true);
+                setCommentaryRequested(true);
+              }
+            }}
+          />
+
+          {/* Intro Overlay for free/guest users */}
+          <BibleIntroOverlay
+            visible={showIntroOverlay}
+            onClose={() => setShowIntroOverlay(false)}
+            isLoggedIn={isLoggedIn}
+            onSignIn={() => {
+              setShowIntroOverlay(false);
+              navigation.navigate('Premium', { screen: 'Login' });
+            }}
+            onUpgrade={() => {
+              setShowIntroOverlay(false);
+              navigation.navigate('Premium');
+            }}
+          />
+        </View>
+      {/* Upgrade overlay for non-premium users trying to access locked content */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showUpgradeOverlay}
+        onRequestClose={() => setShowUpgradeOverlay(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(30, 0, 50, 0.85)', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{
+            backgroundColor: '#f5e4c3', // parchment
+            borderRadius: 22,
+            padding: 32,
+            maxWidth: 370,
+            alignItems: 'center',
+            borderWidth: 2,
+            borderColor: '#bfae66', // gold edge
+            shadowColor: '#3D0066',
+            shadowOpacity: 0.25,
+            shadowRadius: 18,
+            elevation: 10
+          }}>
+            <MaterialCommunityIcons name="star-crescent" size={48} color="#bfae66" style={{ marginBottom: 10 }} />
+            <Text style={{
+              fontSize: 26,
+              fontWeight: 'bold',
+              color: '#7d5fff',
+              marginBottom: 6,
+              textAlign: 'center',
+              fontFamily: 'serif',
+              textShadowColor: '#fffbe6',
+              textShadowOffset: { width: 0, height: 2 },
+              textShadowRadius: 8
+            }}>
+              Unlock Mystical Insights
+            </Text>
+            <Text style={{
+              fontSize: 18,
+              color: '#2A004B',
+              textAlign: 'center',
+              marginBottom: 16,
+              fontWeight: '600',
+              fontFamily: 'serif',
+            }}>
+              Mystical Interpretation for this passage is a premium feature.
+            </Text>
+            <View style={{ marginBottom: 18, marginTop: 2, width: '100%' }}>
+              <Text style={{ fontSize: 16, color: '#4b3ca7', textAlign: 'left', fontFamily: 'serif', marginBottom: 8 }}>
+                • Unlimited mystical commentary for all books & chapters
+              </Text>
+              <Text style={{ fontSize: 16, color: '#4b3ca7', textAlign: 'left', fontFamily: 'serif', marginBottom: 8 }}>
+                • Exclusive mystical insights & advanced interpretations
+              </Text>
+              <Text style={{ fontSize: 16, color: '#4b3ca7', textAlign: 'left', fontFamily: 'serif', marginBottom: 8 }}>
+                • Early access to new features & content
+              </Text>
+              <Text style={{ fontSize: 16, color: '#4b3ca7', textAlign: 'left', fontFamily: 'serif' }}>
+                • Sync across devices & privacy protection
+              </Text>
+            </View>
+            <View style={{ width: '100%', marginTop: 8, alignItems: 'center' }}>
+              <TouchableOpacity
+                style={{ backgroundColor: '#ffe066', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 28, borderWidth: 1, borderColor: '#bfae66', elevation: 2, marginBottom: 14, minWidth: 180, alignItems: 'center' }}
+                onPress={() => {
+                  setShowUpgradeOverlay(false);
+                  navigation.navigate('Premium');
+                }}
+              >
+                <Text style={{ color: '#2A004B', fontWeight: 'bold', fontSize: 17, fontFamily: 'serif', textAlign: 'center' }}>Upgrade Now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ backgroundColor: '#eee7d7', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 28, borderWidth: 1, borderColor: '#bfae66', minWidth: 180, alignItems: 'center' }}
+                onPress={() => setShowUpgradeOverlay(false)}
+              >
+                <Text style={{ color: '#7d5fff', fontWeight: 'bold', fontSize: 17, fontFamily: 'serif', textAlign: 'center' }}>Maybe Later</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <Modal
         animationType="slide"
         transparent={true}
         visible={showCommentaryModal}
         onRequestClose={() => setShowCommentaryModal(false)}
       >
+        {!user ? (
+          <MysticalAuthGate
+            visible={true}
+            onLoginPress={() => {
+              
+              setShowCommentaryModal(false);
+              navigation.navigate('Premium', { screen: 'Login' });
+            }}
+            onUpgradePress={() => {
+              
+              setShowCommentaryModal(false);
+              navigation.navigate('Premium');
+            }}
+            onDismiss={() => {
+              
+              setShowCommentaryModal(false);
+            }}
+          />
+        ) : (
         <View style={styles.modalOverlay}>
+          {console.log('[BibleScreen] Commentary object for BookmarkToggle:', commentary, 'commentaryId:', commentary && typeof commentary === 'object' && commentary.id ? commentary.id : null)}
+          <BookmarkToggle
+            anchor={{
+              book,
+              chapter,
+              startVerse: selectedRange ? Math.min(selectedRange.start, selectedRange.end) : verse,
+              endVerse: selectedRange ? Math.max(selectedRange.start, selectedRange.end) : verse
+            }}
+            commentary={typeof commentary === 'string' ? commentary : (commentary?.commentary || '')}
+            commentaryId={commentary && typeof commentary === 'object' && commentary.id ? commentary.id : null}
+            style={{ position: 'absolute', top: 23, right: 23, zIndex: 20 }}
+            iconColorActive="#2A004B"
+            iconColorInactive="#2A004B"
+            iconColorDefault="#2A004B"
+            isPremium={isPremium}
+            isAllowedFree={isAllowedFree}
+            onPremiumBlock={() => setShowBookmarkPremiumOverlay(true)}
+          />
           <View style={[styles.modalContent, {flexDirection: 'column', justifyContent: 'space-between'}]}>
             <ScrollWornEdgesCommentary style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', zIndex: 0 }} width={340} height={510} />
             <VignetteBackground borderRadius={22} />
@@ -457,6 +726,7 @@ const BibleScreen = ({ navigation }) => {
               <Text style={styles.errorText}>{commentaryError}</Text>
             ) : commentary ? (
               <ScrollView contentContainerStyle={{paddingVertical: 24, flexGrow: 1}}>
+                
                 <Text style={[styles.illuminationLabelBible, {fontSize: 20, textAlign: 'center', marginBottom: 8}]}>Mystical Interpretation</Text>
                 <Text style={[styles.verseRef, {fontSize: 16, textAlign: 'center', marginBottom: 12, color: '#4b3ca7', fontWeight: 'bold'}]}>
                   {book} {chapter}:{selectedRange ? (
@@ -490,7 +760,16 @@ const BibleScreen = ({ navigation }) => {
 </TouchableOpacity>
           </View>
         </View>
+        )}
       </Modal>
+      <BookmarkPremiumOverlay
+        visible={showBookmarkPremiumOverlay}
+        onUpgrade={() => {
+          setShowBookmarkPremiumOverlay(false);
+          navigation.navigate('Premium');
+        }}
+        onClose={() => setShowBookmarkPremiumOverlay(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -698,15 +977,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#8a6d3b', // deep brown edge
     padding: 8, // reduced from 18
-    marginBottom: 18, // reduced from 28
-    minHeight: 40,
-    maxHeight: 620, // doubled from 240
+    // marginBottom is now set dynamically in the component based on GMI button height
+    // minHeight and maxHeight are now set dynamically in the component, not here
     shadowColor: '#3a1d00',
     shadowOpacity: 0.22,
     shadowRadius: 13,
     elevation: 6,
     overflow: 'hidden', // for vignette overlay
     position: 'relative',
+    flexGrow: 1, // allow dynamic expansion
   },
   verseTouchable: {
     paddingVertical: 8,

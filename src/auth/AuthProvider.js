@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[AuthProvider] useEffect running...');
+    // console.log('[AuthProvider] useEffect running...');
     // Debug: Check SecureStore for Supabase token
     // Debugging for persistent login (commented out after confirmation):
     // SecureStore.getItemAsync('supabase.auth.token').then(token => {
@@ -28,20 +28,26 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for auth state changes
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[AuthProvider] onAuthStateChange event:', event, 'session:', session);
+      // console.log('[AuthProvider] onAuthStateChange event:', event, 'session:', session);
       setUser(session?.user ?? null);
       // Debug: Check SecureStore for Supabase token after auth event
-      SecureStore.getItemAsync('supabase.auth.token').then(token => {
-        console.log('[AuthProvider] SecureStore supabase.auth.token (onAuthStateChange):', token);
-      });
+      // SecureStore.getItemAsync('supabase.auth.token').then(token => {
+//   console.log('[AuthProvider] SecureStore supabase.auth.token (onAuthStateChange):', token);
+// });
     });
     return () => {
       listener?.subscription?.unsubscribe?.();
     };
   }, []);
 
+  // Add logout function
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, setUser, loading }}>
+    <AuthContext.Provider value={{ user, setUser, loading, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -12,6 +12,7 @@ import DivineInspirationScreen from '../screens/DivineInspirationScreen';
 import AuthStack from './AuthStack';
 import { useAuth } from '../auth/useAuth';
 import PremiumScreen from '../screens/PremiumScreen';
+import ForgotPasswordScreen from '../auth/ForgotPasswordScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,8 +34,74 @@ const AppNavigator = () => {
           headerShown: false,
         }} />
         <Stack.Screen name="Premium" component={PremiumScreen} options={{
-          headerShown: true,
-          title: 'Premium',
+          headerStyle: {
+            backgroundColor: 'transparent',
+            borderBottomWidth: 3,
+            borderBottomColor: 'gold',
+            height: 0,
+          },
+          headerBackground: () => (
+            <View style={{ position: 'absolute', left: -84, top: -40, width: '100%', height: '100%', zIndex: 0, transform: [{ scaleY: 1 }] }} pointerEvents="none">
+              <RoyalPurpleNavBarBackground width={600} height={300} />
+            </View>
+          ),
+          headerTitle: () => (
+            <Text
+              style={{
+                fontFamily: 'Cardo-Bold',
+                fontSize: 26,
+                fontWeight: 'bold',
+                letterSpacing: 1.2,
+                textAlign: 'center',
+                color: '#ffe066',
+                textShadowColor: '#bfae66',
+                textShadowOffset: { width: 0, height: 2 },
+                textShadowRadius: 8,
+              }}
+            >
+              Premium Features
+            </Text>
+          ),
+          headerTitleAlign: 'center',
+          headerTintColor: 'gold',
+          headerBackTitleVisible: false,
+          headerShadowVisible: false,
+          headerBackImage: ({ tintColor }) => <OpulentBackArrow color={tintColor || 'gold'} size={32} />, 
+        }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{
+          headerStyle: {
+            backgroundColor: 'transparent',
+            borderBottomWidth: 3,
+            borderBottomColor: 'gold',
+            height: 0,
+          },
+          headerBackground: () => (
+            <View style={{ position: 'absolute', left: -84, top: -40, width: '100%', height: '100%', zIndex: 0, transform: [{ scaleY: 1 }] }} pointerEvents="none">
+              <RoyalPurpleNavBarBackground width={600} height={300} />
+            </View>
+          ),
+          headerTitle: () => (
+            <Text
+              style={{
+                fontFamily: 'Cardo-Bold',
+                fontSize: 26,
+                fontWeight: 'bold',
+                letterSpacing: 1.2,
+                textAlign: 'center',
+                color: '#ffe066',
+                textShadowColor: '#bfae66',
+                textShadowOffset: { width: 0, height: 2 },
+                textShadowRadius: 8,
+              }}
+            >
+              Reset Password
+            </Text>
+          ),
+          headerTitleAlign: 'center',
+          headerTintColor: 'gold',
+          headerBackTitleVisible: false,
+          headerShadowVisible: false,
+          headerBackImage: ({ tintColor }) => <OpulentBackArrow color={tintColor || 'gold'} size={32} />, 
         }} />
       <Stack.Screen name="Bible" component={BibleScreen} options={{
         headerStyle: {

@@ -6,22 +6,35 @@ console.log('🟢 [INTERNAL TEST 001][App] Bundle loaded.');
 // 🔎 Log Expo runtime version for OTA update debugging
 import appJson from './app.json';
 console.log('🔎 [INTERNAL TEST 001][App] Runtime version:', appJson.expo?.runtimeVersion || 'unknown');
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import AboutOverlay, { shouldShowAboutOverlay } from './src/components/AboutOverlay';
 import AppNavigator from './src/navigation/AppNavigator';
 import AppFontLoader from './AppFontLoader';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 Sentry.init({
-  dsn: 'https://92af02fd7b281ff6a4fd22822f445bbf@o4509155859496960.ingest.us.sentry.io/4509155862183936', // TODO: Replace with your actual Sentry DSN
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   enableInExpoDevelopment: true,
-  debug: true, // Set to false in production
+  debug: typeof __DEV__ !== 'undefined' && __DEV__, // Only debug in dev
 });
+
+if (!process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  console.warn('[Sentry] WARNING: SENTRY_DSN is not set in your environment variables. Errors will not be reported to Sentry.');
+}
 
 import { AuthProvider } from './src/auth/AuthProvider';
 import { ProfileProvider } from './src/auth/useProfile';
 
 export default function App() {
+  const [showAbout, setShowAbout] = useState(false);
   useEffect(() => {
+    // Show About overlay on first launch unless opted out
+    (async () => {
+      const shouldShow = await shouldShowAboutOverlay();
+      setShowAbout(shouldShow);
+    })();
+
     // Test Sentry error (remove after confirming integration)
     //Sentry.Native.captureException(new Error('Test Sentry error!'));
 
@@ -37,15 +50,18 @@ export default function App() {
     });
   }, []);
   return (
-    <ProfileProvider>
-      <AuthProvider>
-        <SafeAreaProvider>
-          <AppFontLoader>
-            <AppNavigator />
-          </AppFontLoader>
-        </SafeAreaProvider>
-      </AuthProvider>
-    </ProfileProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AboutOverlay visible={showAbout} onDismiss={() => setShowAbout(false)} />
+      <ProfileProvider>
+        <AuthProvider>
+          <SafeAreaProvider>
+            <AppFontLoader>
+              <AppNavigator />
+            </AppFontLoader>
+          </SafeAreaProvider>
+        </AuthProvider>
+      </ProfileProvider>
+    </GestureHandlerRootView>
   );
 }
 

@@ -16,6 +16,9 @@ if (!ENV_BACKEND_URL) {
 
 const API_BASE_URL = ENV_BACKEND_URL || '';
 
+// console.log('[INTERNAL TEST][api.js] API_BASE_URL at runtime:', API_BASE_URL);
+// console.log('[INTERNAL TEST][api.js] process.env.EXPO_PUBLIC_BACKEND_API_URL:', process.env.EXPO_PUBLIC_BACKEND_API_URL);
+
 export default {
   API_BASE_URL,
 };

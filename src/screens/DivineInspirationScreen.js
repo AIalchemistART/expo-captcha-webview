@@ -2,10 +2,16 @@ import React from 'react';
 import { useRandomPassageCommentary } from '../hooks/useRandomPassageCommentary';
 import { StatusBar } from 'expo-status-bar';
 import MysticalHomeBackground from '../components/MysticalHomeBackground';
+import DivineInspirationInfoOverlay from '../components/DivineInspirationInfoOverlay';
+import DivineInspirationPremiumOverlay from '../components/DivineInspirationPremiumOverlay';
+import { useAuth } from '../auth/useAuth';
+const { useProfile } = require('../auth/useProfile');
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScrollWornEdgesCommentary from '../components/ScrollWornEdgesCommentary';
 import GoldBubbleBackground from '../components/GoldBubbleBackground';
 import { SafeAreaView, Text, StyleSheet, View, ActivityIndicator, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import GetInspiredRadioButton from '../components/GetInspiredRadioButton';
+import BookmarkToggle from '../components/BookmarkToggle';
 import apiConfig from '../config/api';
 import { BIBLE_STRUCTURE } from '../utils/bibleStructure';
 import { getVerse, getChapter } from '../utils/bibleText';
@@ -28,6 +34,20 @@ function getRandomPassage() {
 }
 
 const DivineInspirationScreen = ({ navigation }) => {
+  // Auth and profile
+  const { user } = useAuth();
+  const { profile } = useProfile();
+  const isLoggedIn = !!user;
+  const isPremium = !!profile?.is_paid;
+  // Info overlay state
+  const [showInfoOverlay, setShowInfoOverlay] = React.useState(false);
+  const [showPremiumOverlay, setShowPremiumOverlay] = React.useState(false);
+  React.useEffect(() => {
+    AsyncStorage.getItem('mbc_di_overlay_dismissed_v1').then(val => {
+      setShowInfoOverlay(val !== 'true');
+    });
+  }, []);
+
   const {
     passage,
     getNewPassage,
@@ -42,13 +62,71 @@ const DivineInspirationScreen = ({ navigation }) => {
     refreshFromGlobal,
   } = useRandomPassageCommentary();
 
+  // --- Dynamic collision logic for invocation/illumination card ---
+  const { height } = require('react-native').useWindowDimensions();
+  const insets = (require('react-native-safe-area-context').useSafeAreaInsets?.() ?? { top: 0, bottom: 0 });
+  // Use insets.top for spacing above the invocation card
+  const reservedTop = insets.top + 16; // 16px buffer
+  // GMI button height (estimate, adjust if needed)
+  const GMI_BUTTON_HEIGHT = 56;
+  // Robust bottom inset: fallback to 48px if insets.bottom is 0 (for Android nav bar)
+  const bottomInset = (insets.bottom && insets.bottom > 0) ? insets.bottom : 48;
+  console.log('[DIscreen] bottomInset (with fallback):', bottomInset);
+  // Only subtract GMI button height if it will be rendered (i.e., passage && commentary)
+  const willShowGMI = passage && commentary;
+  const reservedBottom = 70 + bottomInset + 12 + (willShowGMI ? GMI_BUTTON_HEIGHT : 0);
+  const minHeight = 220;
+  const staticMaxHeight = 380;
+  // Subtract reservedTop for true collision protection at the top
+  const available = height - reservedBottom - reservedTop;
+  const maxHeight = Math.max(minHeight, Math.min(available, staticMaxHeight));
+  // --- Logging for collision debugging ---
+  console.log('[DIscreen] windowHeight:', height);
+  console.log('[DIscreen] insets:', insets);
+  console.log('[DIscreen] reservedTop:', reservedTop, 'reservedBottom:', reservedBottom);
+  console.log('[DIscreen] available:', available, 'maxHeight:', maxHeight);
+  // --- End dynamic collision logic ---
+
   // Defensive: get commentary string for rendering
   const commentaryText = commentary && commentary.commentary ? commentary.commentary : null;
 
+  // Move bottomInset+16 padding to SafeAreaView (top-level)
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: bottomInset + 16 }]} edges={['top', 'bottom']}>
       <MysticalHomeBackground />
       <StatusBar style="light" backgroundColor="transparent" translucent={true} />
+
+      <DivineInspirationInfoOverlay
+        visible={showInfoOverlay}
+        isLoggedIn={isLoggedIn}
+        isPremium={isPremium}
+        onSignIn={() => {
+          setShowInfoOverlay(false);
+          navigation.navigate('Premium', { screen: 'Login' });
+        }}
+        onUpgrade={() => {
+          setShowInfoOverlay(false);
+          navigation.navigate('Premium');
+        }}
+        onGetInspired={() => setShowInfoOverlay(false)}
+        onPremiumBlock={() => setShowInfoOverlay(false)}
+        onClose={() => setShowInfoOverlay(false)}
+      />
+      {showPremiumOverlay && (
+        <DivineInspirationPremiumOverlay
+          visible={showPremiumOverlay}
+          isLoggedIn={isLoggedIn}
+          onSignIn={() => {
+            setShowPremiumOverlay(false);
+            navigation.navigate('Premium', { screen: 'Login' });
+          }}
+          onUpgrade={() => {
+            setShowPremiumOverlay(false);
+            navigation.navigate('Premium');
+          }}
+          onClose={() => setShowPremiumOverlay(false)}
+        />
+      )}
       
       {!passage && (
         <View style={{ marginTop: -30, alignItems: 'center', width: '100%' }}>
@@ -56,8 +134,20 @@ const DivineInspirationScreen = ({ navigation }) => {
         </View>
       )}
       {passage && (
-        <View style={[styles.invocationCard, styles.contentSpacing]}>
-          <ScrollView style={styles.invocationContentScroll} contentContainerStyle={{alignItems: 'center'}}>
+        <View style={[styles.invocationCard, styles.contentSpacing, { maxHeight, minHeight, marginTop: reservedTop }]} onLayout={e => {
+          const { x, y, width, height } = e.nativeEvent.layout;
+          console.log('[DIscreen] invocationCard layout:', { x, y, width, height });
+        }}>
+          {/* Parent container for invocation card and GMI button; add onLayout for logging */}
+          <ScrollView
+            style={styles.invocationContentScroll}
+            contentContainerStyle={{alignItems: 'center'}}
+            onLayout={e => {
+              const { x, y, width, height } = e.nativeEvent.layout;
+              // console.log('[DIscreen] parent container layout:', { x, y, width, height });
+              // console.log('[DIscreen] insets.bottom:', insets.bottom, 'bottomInset (with fallback):', bottomInset);
+            }}
+          >
             <Text style={styles.inspirationLabel}>Inspiration Verse</Text>
             <Text style={styles.invocationRef}>
               {passage.book} {passage.chapter}:{passage.anchorVerse}
@@ -71,7 +161,13 @@ const DivineInspirationScreen = ({ navigation }) => {
       <View style={[{ marginTop: 0, width: '100%', alignItems: 'center' }, styles.contentSpacing]}>
         <GetInspiredRadioButton
           selected={!passage && !commentary && !commentaryLoading}
-          onPress={getNewPassage}
+          onPress={() => {
+            if (isPremium) {
+              getNewPassage();
+            } else {
+              setShowPremiumOverlay(true);
+            }
+          }}
           loading={commentaryLoading}
           label="Get Inspired!"
         />
@@ -81,7 +177,7 @@ const DivineInspirationScreen = ({ navigation }) => {
       <>
 
         {passage && (
-          <View style={[styles.illuminationCard, styles.contentSpacing]}>
+          <View style={[styles.illuminationCard, styles.contentSpacing, { maxHeight }]}>
             <ScrollView style={styles.illuminationContentScroll}>
               <Text style={styles.illuminationLabel}>Contextual Illumination</Text>
               {Array.isArray(passage.verses) && passage.verses.length > 0 ? (
@@ -116,11 +212,18 @@ const DivineInspirationScreen = ({ navigation }) => {
             onPress={() => setShowCommentaryModal(true)}
             accessibilityRole="button"
             accessibilityLabel="Get Mystical Interpretation"
+            onLayout={e => {
+              const { x, y, width, height } = e.nativeEvent.layout;
+              console.log('[DIscreen] GMI button layout:', { x, y, width, height });
+            }}
           >
             <Text style={styles.mysticalTextButtonText}>Get Mystical Interpretation</Text>
           </TouchableOpacity>
         )}
-        
+        {/* Spacer to reserve space for GMI button when not rendered */}
+        {!willShowGMI && (
+          <View style={{ height: GMI_BUTTON_HEIGHT + (insets.bottom || 0) + 16 }} />
+        )}
         <Modal
           animationType="slide"
           transparent={true}
@@ -128,6 +231,24 @@ const DivineInspirationScreen = ({ navigation }) => {
           onRequestClose={() => setShowCommentaryModal(false)}
         >
           <View style={styles.modalOverlay}>
+            {/* Bookmark toggle for DI, anchor is set (not null) */}
+            {passage && (
+              <BookmarkToggle
+                anchor={{
+                  book: passage.book,
+                  chapter: passage.chapter,
+                  startVerse: passage.startVerse,
+                  endVerse: passage.endVerse,
+                  anchorVerse: passage.anchorVerse
+                }}
+                commentary={typeof commentary === 'string' ? commentary : (commentary?.commentary || '')}
+                commentaryId={commentary && typeof commentary === 'object' && commentary.id ? commentary.id : null}
+                style={{ position: 'absolute', top: 23, right: 23, zIndex: 20 }}
+                iconColorActive="#2A004B"
+                iconColorInactive="#2A004B"
+                iconColorDefault="#2A004B"
+              />
+            )}
             <View style={[styles.modalContent, {flexDirection: 'column', justifyContent: 'space-between'}]}>
               <ScrollWornEdgesCommentary style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', zIndex: 0 }} width={340} height={510} />
               <ScrollView contentContainerStyle={{paddingVertical: 24, flexGrow: 1}} style={{width: '100%', zIndex: 1}}>

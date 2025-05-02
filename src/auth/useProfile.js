@@ -10,9 +10,9 @@ export function ProfileProvider({ children }) {
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    console.log('[ProfileProvider] Mounting...');
+    // console.log('[ProfileProvider] Mounting...');
     supabase.auth.getUser().then(({ data, error }) => {
-      console.log('[ProfileProvider] getUser:', data, error);
+      // console.log('[ProfileProvider] getUser:', data, error);
       if (data && data.user) {
         supabase
           .from('profiles')
@@ -20,7 +20,7 @@ export function ProfileProvider({ children }) {
           .eq('id', data.user.id)
           .single()
           .then(({ data: profileData, error: profileError }) => {
-            console.log('[ProfileProvider] profile fetch:', profileData, profileError);
+            // console.log('[ProfileProvider] profile fetch:', profileData, profileError);
             if (!profileError && profileData) {
               setProfile(profileData);
             }

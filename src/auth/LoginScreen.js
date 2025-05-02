@@ -1,12 +1,12 @@
 // Login screen UI (to be implemented)
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity } from 'react-native';
 import { supabase } from '../services/supabaseClient';
 
 import { useAuth } from './useAuth';
 import { useProfile } from './useProfile';
 
-export default function LoginScreen({ onSwitchScreen = () => {} }) {
+export default function LoginScreen({ onSwitchScreen = () => {}, navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,7 +24,7 @@ export default function LoginScreen({ onSwitchScreen = () => {} }) {
     setError('');
     try {
       const result = await supabase.auth.signInWithPassword({ email, password });
-      console.log('SUPABASE LOGIN RESULT:', result);
+      // console.log('SUPABASE LOGIN RESULT:', result);
       const { error, data } = result;
       if (error) {
         setError(error.message);
@@ -45,7 +45,7 @@ export default function LoginScreen({ onSwitchScreen = () => {} }) {
             console.warn('Failed to fetch user profile:', profileError.message);
           } else {
             setProfile(profile); // Store profile globally for premium gating
-            console.log('Fetched user profile:', profile);
+            // console.log('Fetched user profile:', profile);
           }
         } catch (e) {
           console.error('Unexpected error fetching profile:', e);
@@ -95,9 +95,28 @@ export default function LoginScreen({ onSwitchScreen = () => {} }) {
         onChangeText={setPassword}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button title={loading ? 'Logging in...' : 'Login'} onPress={handleLogin} disabled={loading} />
-      <Button title="Forgot Password?" onPress={() => setShowForgot(true)} />
-      <Button title="Don't have an account? Sign Up" onPress={() => onSwitchScreen && onSwitchScreen()} />
+      <TouchableOpacity
+        style={[styles.mysticalButton, loading && styles.mysticalButtonDisabled]}
+        onPress={handleLogin}
+        disabled={loading}
+        accessibilityRole="button"
+      >
+        <Text style={styles.mysticalButtonText}>{loading ? 'Logging in...' : 'Login'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.mysticalButtonAlt}
+        onPress={() => navigation.navigate('ForgotPassword')}
+        accessibilityRole="button"
+      >
+        <Text style={styles.mysticalButtonAltText}>Forgot Password?</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.mysticalButtonAlt}
+        onPress={() => onSwitchScreen && onSwitchScreen()}
+        accessibilityRole="button"
+      >
+        <Text style={[styles.mysticalButtonAltText, { textAlign: 'center' }]}>Don't have an account? Sign Up</Text>
+      </TouchableOpacity>
       {showForgot && (
         <View style={styles.forgotContainer}>
           <Text style={styles.forgotTitle}>Reset Password</Text>
@@ -109,9 +128,22 @@ export default function LoginScreen({ onSwitchScreen = () => {} }) {
             onChangeText={setForgotEmail}
             keyboardType="email-address"
           />
-          <Button title={forgotLoading ? 'Sending...' : 'Send Reset Email'} onPress={handleForgot} disabled={forgotLoading} />
+          <TouchableOpacity
+            style={[styles.mysticalButton, forgotLoading && styles.mysticalButtonDisabled]}
+            onPress={handleForgot}
+            disabled={forgotLoading}
+            accessibilityRole="button"
+          >
+            <Text style={styles.mysticalButtonText}>{forgotLoading ? 'Sending...' : 'Send Reset Email'}</Text>
+          </TouchableOpacity>
           {forgotMessage ? <Text style={styles.forgotMessage}>{forgotMessage}</Text> : null}
-          <Button title="Cancel" onPress={() => { setShowForgot(false); setForgotMessage(''); }} />
+          <TouchableOpacity
+            style={styles.mysticalButtonAlt}
+            onPress={() => { setShowForgot(false); setForgotMessage(''); }}
+            accessibilityRole="button"
+          >
+            <Text style={styles.mysticalButtonAltText}>Cancel</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -120,9 +152,88 @@ export default function LoginScreen({ onSwitchScreen = () => {} }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 12, marginBottom: 12 },
+  title: {
+    fontFamily: 'Cardo-Bold',
+    fontSize: 26,
+    fontWeight: 'bold',
+    letterSpacing: 1.2,
+    textAlign: 'center',
+    color: '#ffe066',
+    textShadowColor: '#bfae66',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+    marginBottom: 24,
+  },
+  input: {
+    backgroundColor: '#fffbe6',
+    borderWidth: 2,
+    borderColor: '#ffe066',
+    borderRadius: 12,
+    color: '#3D0066',
+    fontFamily: 'serif',
+    fontSize: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    marginBottom: 14,
+    shadowColor: '#bfae66',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   error: { color: 'red', marginBottom: 12, textAlign: 'center' },
+  mysticalButton: {
+    backgroundColor: '#ffe066',
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 36,
+    marginVertical: 10,
+    shadowColor: '#ffe066',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.32,
+    shadowRadius: 12,
+    elevation: 4,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fffbe6',
+  },
+  mysticalButtonDisabled: {
+    opacity: 0.65,
+  },
+  mysticalButtonText: {
+    color: '#3D0066',
+    fontWeight: 'bold',
+    fontFamily: 'Cardo-Bold',
+    fontSize: 20,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  mysticalButtonAlt: {
+    backgroundColor: '#fffbe6',
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
+    marginVertical: 8,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ffe066',
+    shadowColor: '#ffe066',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  mysticalButtonAltText: {
+    color: '#ffe066',
+    fontWeight: 'bold',
+    fontFamily: 'Cardo-Bold',
+    fontSize: 18,
+    letterSpacing: 1.15,
+    textTransform: 'uppercase',
+    textShadowColor: '#3D0066',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
   forgotContainer: { backgroundColor: '#ffe06622', borderRadius: 8, padding: 16, marginTop: 20 },
   forgotTitle: { fontSize: 18, fontWeight: 'bold', color: '#3D0066', marginBottom: 8, textAlign: 'center' },
   forgotMessage: { color: '#155724', marginTop: 8, marginBottom: 8, textAlign: 'center' },
