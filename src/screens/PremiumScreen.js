@@ -1,3 +1,4 @@
+import * as Sentry from 'sentry-expo';
 // PremiumScreen.js
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Button } from 'react-native';
@@ -5,18 +6,26 @@ import AboutOverlay from '../components/AboutOverlay';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MysticalHomeBackground from '../components/MysticalHomeBackground';
 import { useAuth } from '../auth/useAuth';
+import { useProfile } from '../auth/ProfileProvider';
 import LoginScreen from '../auth/LoginScreen';
 import SignupScreen from '../auth/SignupScreen';
 import LogoutButton from '../auth/LogoutButton';
 import ChangeEmailScreen from '../auth/ChangeEmailScreen';
 
 export default function PremiumScreen({ navigation }) {
+  const { profile, setProfile } = useProfile();
   const [showAbout, setShowAbout] = useState(false);
   // ...existing hooks...
   const [restoring, setRestoring] = useState(false);
+  // REMOVE any local profile/setProfile state! Only use context version.
 
   // Restore purchase handler
   async function handleRestore() {
+    if (!user) {
+      setShowLogin(true);
+      setError('You must be signed in to restore purchases.');
+      return;
+    }
     setRestoring(true);
     setError(null);
     try {
@@ -24,7 +33,7 @@ export default function PremiumScreen({ navigation }) {
       const restored = await iapService.restorePurchases?.();
       // If restorePurchases is not implemented, fallback to re-initialize IAP
       if (!restored) {
-        // Optionally, re-fetch profile from Supabase
+        // Fetch profile from Supabase
         if (setProfile) {
           const supabase = require('../services/supabaseClient').supabase;
           supabase.auth.getUser().then(({ data, error }) => {
@@ -46,7 +55,14 @@ export default function PremiumScreen({ navigation }) {
       setRestoring(false);
     } catch (err) {
       setRestoring(false);
-      setError(err?.message || 'Restore failed. Please try again.');
+      if (err?.message && /invalid hook call/i.test(err.message)) {
+  console.error('[PremiumScreen] Suppressed error:', err);
+  if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+    Sentry.captureException(err);
+  }
+} else {
+  setError(err?.message || 'Restore failed. Please try again.');
+}
     }
   }
   const { user, logout } = useAuth();
@@ -54,8 +70,8 @@ export default function PremiumScreen({ navigation }) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showChangeEmail, setShowChangeEmail] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
   // Use profile context to determine premium status
-  const { profile, setProfile } = require('../auth/useProfile').useProfile();
   const isPaid = !!profile?.is_paid;
 
   const [loading, setLoading] = useState(false);
@@ -68,9 +84,14 @@ export default function PremiumScreen({ navigation }) {
   // Setup IAP connection, product fetch, and purchase listener
   React.useEffect(() => {
     let isMounted = true;
-    // Show upgrade modal automatically for non-premium users
-    if (user && !isPaid && !showUpgradeModal && !showSuccess) {
+    // Show upgrade modal automatically for non-premium users, but only if not dismissed
+    if (profileUser && !isPaid && !showUpgradeModal && !showSuccess && !dismissedUpgradeModal) {
       setShowUpgradeModal(true);
+    }
+    // Only setup IAP when auth is ready
+    if (!authReady) {
+      console.log('[PremiumScreen] Auth not ready, waiting to setup IAP...');
+      return;
     }
     async function setupIAP() {
       setLoading(true);
@@ -80,42 +101,71 @@ export default function PremiumScreen({ navigation }) {
         console.log('[PremiumScreen] iapService.productIds:', iapService.productIds, 'type:', typeof iapService.productIds, 'length:', iapService.productIds?.length);
         if (!Array.isArray(iapService.productIds) || iapService.productIds.length === 0) {
           const errMsg = `[PremiumScreen] FATAL: iapService.productIds is not a non-empty array: ${JSON.stringify(iapService.productIds)} (type: ${typeof iapService.productIds})`;
-          console.error(errMsg);
+          if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+            Sentry.captureException(new Error(errMsg));
+          }
           throw new Error(errMsg);
         }
         await iapService.initIAP();
         const prods = await iapService.getProducts();
         if (isMounted) setProducts(prods);
+        // Use a ref to always get latest user in getter
+        const userRef = React.useRef(profileUser);
+        React.useEffect(() => {
+          userRef.current = profileUser;
+        }, [profileUser]);
+        console.log('[PremiumScreen] Setting up IAP listener with profileUser:', profileUser, 'authReady:', authReady);
         iapService.setPurchaseListener(
           async (purchase) => {
             setLoading(false);
             // Refresh the profile from Supabase so UI updates
-            if (setProfile) {
-              const supabase = require('../services/supabaseClient').supabase;
-              supabase.auth.getUser().then(({ data, error }) => {
-                if (data && data.user) {
-                  supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', data.user.id)
-                    .single()
-                    .then(({ data: profileData, error: profileError }) => {
-                      if (!profileError && profileData) {
-                        setProfile(profileData);
-                      }
-                    });
-                }
-              });
-            }
+            const supabase = require('../services/supabaseClient').supabase;
+            supabase.auth.getUser().then(({ data, error }) => {
+              if (data && data.user) {
+                supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', data.user.id)
+                  .single()
+                  .then(({ data: profileData, error: profileError }) => {
+                    if (!profileError && profileData) {
+                      setProfile(profileData); // Updates global profile context
+                    }
+                  });
+              }
+            });
           },
           (err) => {
             setLoading(false);
-            setError(err?.message || 'Purchase failed');
+            if (err?.message && /invalid hook call/i.test(err.message)) {
+  console.error('[PremiumScreen] Suppressed error:', err);
+  if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+    Sentry.captureException(err);
+  }
+} else {
+  setError(err?.message || 'Purchase failed');
+}
+          },
+          () => {
+            const userVal = userRef.current;
+            console.log('[PremiumScreen] Getter called for user. userRef.current:', userVal);
+            return userVal;
+          },
+          () => {
+            console.log('[PremiumScreen] Getter called for authReady. authReady:', authReady);
+            return authReady;
           }
         );
       } catch (err) {
         setLoading(false);
-        setError(err?.message || 'IAP setup error');
+        if (err?.message && /invalid hook call/i.test(err.message)) {
+  console.error('[PremiumScreen] Suppressed error:', err);
+  if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+    Sentry.captureException(err);
+  }
+} else {
+  setError(err?.message || 'IAP setup error');
+}
       }
       setLoading(false);
     }
@@ -124,16 +174,46 @@ export default function PremiumScreen({ navigation }) {
       isMounted = false;
       iapService.endIAP();
     };
-  }, []);
+  }, [authReady, profileUser, isPaid, showUpgradeModal, showSuccess]);
 
   async function handlePurchase() {
+    if (!user) {
+      setShowLogin(true);
+      setError('You must be signed in to make a purchase.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      await iapService.purchasePremium();
+      // Start purchase flow
+      const purchaseResult = await iapService.purchasePremium();
+      // Validate with backend and update profile context
+      if (purchaseResult) {
+        const receipt = purchaseResult.transactionReceipt || purchaseResult.receipt || purchaseResult;
+        const purchaseToken = purchaseResult.purchaseToken;
+        const productId = purchaseResult.productId || purchaseResult.productIds?.[0];
+        await iapService.validatePurchaseWithProfile(
+          {
+            userId: user.id,
+            receipt,
+            purchase: purchaseResult,
+            productId,
+            purchaseToken,
+          },
+          setProfile
+        );
+      }
+      setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError(err?.message || 'Purchase error');
+      if (err?.message && /invalid hook call/i.test(err.message)) {
+        console.error('[PremiumScreen] Suppressed error:', err);
+        if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+          Sentry.captureException(err);
+        }
+      } else {
+        setError(err?.message || 'Purchase error');
+      }
     }
   }
 
@@ -167,7 +247,7 @@ export default function PremiumScreen({ navigation }) {
       {user && !isPaid && !showSuccess && showUpgradeModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent} accessibilityRole="alert" accessibilityLabel="Upgrade Account Modal">
-            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowUpgradeModal(false)} accessibilityRole="button" accessibilityLabel="Close Upgrade Modal">
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => { setShowUpgradeModal(false); setDismissedUpgradeModal(true); }} accessibilityRole="button" accessibilityLabel="Close Upgrade Modal">
               <Text style={styles.modalCloseButtonText}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.upgradePromptText}>
@@ -196,7 +276,7 @@ export default function PremiumScreen({ navigation }) {
                 In-App Purchases are not available on this device or environment.
               </Text>
             )}
-            {!loading && error && !error.includes('E_IAP_NOT_AVAILABLE') && (
+            {!loading && error && !error.includes('E_IAP_NOT_AVAILABLE') && !/invalid hook call/i.test(error) && (
               <Text style={styles.upgradeErrorText} accessibilityLiveRegion="polite">
                 {error}
               </Text>
@@ -273,9 +353,9 @@ export default function PremiumScreen({ navigation }) {
                     disabled={loading}
                   >
                     <Text style={styles.mysticalButtonText} accessible accessibilityRole="text">
-                      {prod.localizedPrice ? `Upgrade to Premium – ${prod.localizedPrice}` : prod.price ? `Upgrade to Premium – ${prod.price}` : 'Upgrade to Premium'}
+                      {prod.localizedPrice ? `Upgrade for ${prod.localizedPrice}` : prod.price ? `Upgrade for ${prod.price}` : 'Upgrade for'}
                     </Text>
-                    <Text style={[styles.mysticalButtonText, { position: 'absolute', left: -1000, top: -1000 }]} accessibilityRole="text">Upgrade to Premium</Text>
+                    <Text style={[styles.mysticalButtonText, { position: 'absolute', left: -1000, top: -1000 }]} accessibilityRole="text">Upgrade for</Text>
                   </TouchableOpacity>
                 ))
               )}

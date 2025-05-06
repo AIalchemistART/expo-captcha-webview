@@ -1,5 +1,20 @@
 import * as Sentry from 'sentry-expo';
 
+// Global JS error handler for enhanced logcat visibility
+global.ErrorUtils && global.ErrorUtils.setGlobalHandler && global.ErrorUtils.setGlobalHandler((error, isFatal) => {
+  try {
+    console.error('[GLOBAL JS ERROR]', error, { isFatal });
+  } catch (e) {}
+  // Optionally, call the default handler if it exists
+  if (global.ErrorUtils.getGlobalHandler) {
+    const defaultHandler = global.ErrorUtils.getGlobalHandler();
+    if (defaultHandler && defaultHandler !== global.ErrorUtils.setGlobalHandler) {
+      defaultHandler(error, isFatal);
+    }
+  }
+});
+
+
 // 🟢 App bundle loaded (main entry)
 console.log('🟢 [INTERNAL TEST 001][App] Bundle loaded.');
 
@@ -24,43 +39,18 @@ if (!process.env.EXPO_PUBLIC_SENTRY_DSN) {
 }
 
 import { AuthProvider } from './src/auth/AuthProvider';
-import { ProfileProvider } from './src/auth/useProfile';
+import { ProfileProvider } from './src/auth/ProfileProvider';
 
 export default function App() {
-  const [showAbout, setShowAbout] = useState(false);
-  useEffect(() => {
-    // Show About overlay on first launch unless opted out
-    (async () => {
-      const shouldShow = await shouldShowAboutOverlay();
-      setShowAbout(shouldShow);
-    })();
-
-    // Test Sentry error (remove after confirming integration)
-    //Sentry.Native.captureException(new Error('Test Sentry error!'));
-
-    // TEMP: Test Supabase connection
-    import('./src/services/supabaseClient').then(({ supabase }) => {
-      supabase
-        .from('commentaries') // <-- Replace with your actual table name if different
-        .select('*')
-        .limit(1)
-        .then(({ data, error }) => {
-          console.log('🔎 [INTERNAL TEST 001][App] SUPABASE TEST:', { data, error });
-        });
-    });
-  }, []);
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AboutOverlay visible={showAbout} onDismiss={() => setShowAbout(false)} />
-      <ProfileProvider>
+      <SafeAreaProvider>
         <AuthProvider>
-          <SafeAreaProvider>
-            <AppFontLoader>
-              <AppNavigator />
-            </AppFontLoader>
-          </SafeAreaProvider>
+          <ProfileProvider>
+            <AppNavigator />
+          </ProfileProvider>
         </AuthProvider>
-      </ProfileProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
