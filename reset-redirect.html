@@ -57,10 +57,19 @@
       // Extract token and type from the query params
       function getQueryParam(name) {
         const url = new URL(window.location.href);
-        return url.searchParams.get(name);
+        // Check standard query string
+        let value = url.searchParams.get(name);
+        if (value) return value;
+        // Try hash fragment (after #)
+        if (url.hash) {
+          const hashParams = new URLSearchParams(url.hash.slice(1));
+          value = hashParams.get(name);
+          if (value) return value;
+        }
+        return null;
       }
       function openApp() {
-        var token = getQueryParam('token') || getQueryParam('access_token');
+        var token = getQueryParam('access_token') || getQueryParam('token') || getQueryParam('refresh_token');
         var type = getQueryParam('type');
         if (token && type === 'recovery') {
           // Try to open the app with the token
@@ -68,6 +77,20 @@
         } else {
           alert('Invalid or missing reset token.');
         }
+      }
+      // Debug message on page
+      window.onload = function() {
+        var token = getQueryParam('access_token') || getQueryParam('token') || getQueryParam('refresh_token');
+        var debugDiv = document.createElement('div');
+        debugDiv.style.color = '#bfae66';
+        debugDiv.style.fontSize = '12px';
+        debugDiv.style.marginTop = '20px';
+        if (token) {
+          debugDiv.textContent = 'Token found: ' + token.substring(0,12) + '...';
+        } else {
+          debugDiv.textContent = 'No token found in URL.';
+        }
+        document.querySelector('.container').appendChild(debugDiv);
       }
     </script>
   </head>
