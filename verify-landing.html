@@ -87,5 +87,55 @@
     </ul>
     <a class="cta" href="https://play.google.com/store/apps/details?id=com.aialchemist.mysticalbiblecompanion" target="_blank">Open the App</a>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
+  <script>
+    // TODO: Fill in your Supabase project URL and anon key
+    const SUPABASE_URL = 'https://wweuiqbrnzjrassbztob.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3ZXVpcWJybnpqcmFzc2J6dG9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUwMzc2NjEsImV4cCI6MjA2MDYxMzY2MX0.KR7Tmruc3_jE57eMVrWeilyvVtAqF_pC8HpvKlVo-S4';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function getParam(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name);
+    }
+
+    async function finalizeSession() {
+      const accessToken = getParam('access_token');
+      const refreshToken = getParam('refresh_token');
+      const type = getParam('type');
+      const messageBox = document.createElement('div');
+      messageBox.style.marginTop = '20px';
+      messageBox.style.fontFamily = 'Cardo, serif';
+      messageBox.style.fontSize = '1rem';
+      messageBox.style.color = '#2A004B';
+      const container = document.querySelector('.container');
+
+      if (type === 'email_change' && accessToken && refreshToken) {
+        try {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) {
+            messageBox.textContent = 'There was an error completing your email change. Please try again or contact support.';
+            messageBox.style.color = '#c00';
+          } else {
+            messageBox.textContent = 'Your email has been changed successfully! You may now return to the app.';
+            messageBox.style.color = '#2A004B';
+          }
+        } catch (e) {
+          messageBox.textContent = 'Unexpected error: ' + e.message;
+          messageBox.style.color = '#c00';
+        }
+      } else {
+        // Not an email change or missing tokens
+        messageBox.textContent = '';
+      }
+      if (container && messageBox.textContent) {
+        container.appendChild(messageBox);
+      }
+    }
+    finalizeSession();
+  </script>
 </body>
 </html>
