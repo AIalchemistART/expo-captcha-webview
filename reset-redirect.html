@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mystical Bible Companion - Password Reset</title>
+    <style>
+      body {
+        background: #2A004B;
+        margin: 0;
+        padding: 0;
+        font-family: 'serif', serif;
+        color: #ffe066;
+      }
+      .container {
+        max-width: 480px;
+        margin: 40px auto;
+        background: #3D0066;
+        border-radius: 16px;
+        padding: 32px 24px;
+        color: #ffe066;
+        box-shadow: 0 4px 32px rgba(44,0,75,0.35);
+      }
+      h1 {
+        color: #ffe066;
+        font-family: serif;
+        font-size: 2.2em;
+        margin-bottom: 0.4em;
+      }
+      .instructions {
+        color: #fffbe6;
+        font-size: 18px;
+        margin-bottom: 18px;
+        font-family: sans-serif;
+      }
+      .reset-btn {
+        display: inline-block;
+        padding: 14px 32px;
+        background: #ffe066;
+        color: #3D0066;
+        text-decoration: none;
+        font-weight: bold;
+        border-radius: 8px;
+        font-size: 18px;
+        margin: 24px 0 16px 0;
+        font-family: serif;
+        cursor: pointer;
+        border: none;
+      }
+      .note {
+        color: #bfae66;
+        font-size: 13px;
+        margin-top: 24px;
+      }
+    </style>
+    <script>
+      // Extract token and type from the query params
+      function getQueryParam(name) {
+        const url = new URL(window.location.href);
+        return url.searchParams.get(name);
+      }
+      function openApp() {
+        var token = getQueryParam('token') || getQueryParam('access_token');
+        var type = getQueryParam('type');
+        if (token && type === 'recovery') {
+          // Try to open the app with the token
+          window.location = `mysticalbible://ResetPassword?access_token=${token}`;
+        } else {
+          alert('Invalid or missing reset token.');
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Mystical Bible Companion</h1>
+      <p class="instructions">To finish resetting your password, please tap the button below from your mobile device with the Mystical Bible Companion app installed.</p>
+      <button class="reset-btn" onclick="openApp()">Open App to Reset Password</button>
+      <p class="note">If nothing happens, make sure you have the app installed and try again from your mobile device.<br>If you are on a desktop, please open this email on your phone or tablet.</p>
+      <p style="color:#ffe066;font-size:14px;font-family:serif;margin-top:24px;">Blessings,<br>The Mystical Bible Companion Team</p>
+      <p style="color:#bfae66;font-size:12px;font-family:sans-serif;margin-top:16px;">&copy; 2025 Mystical Bible Companion</p>
+    </div>
+  </body>
+</html>
