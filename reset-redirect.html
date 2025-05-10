@@ -72,8 +72,12 @@
         var token = getQueryParam('access_token') || getQueryParam('token') || getQueryParam('refresh_token');
         var type = getQueryParam('type');
         if (token && type === 'recovery') {
-          // Try to open the app with the token
+          // Try to open the app
           window.location = `mysticalbible://ResetPassword?access_token=${token}`;
+          // Optional: fallback after 2 seconds (no-op, but could show a message or redirect to app store)
+          setTimeout(function() {
+            // window.location = 'https://play.google.com/store/apps/details?id=YOUR_APP_ID';
+          }, 2000);
         } else {
           alert('Invalid or missing reset token.');
         }
