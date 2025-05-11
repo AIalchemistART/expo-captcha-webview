@@ -76,13 +76,36 @@
     <img class="logo" src="https://www.dropbox.com/scl/fi/roubr9818ee23wy0ycgs3/ChatGPT-Image-Apr-22-2025-01_06_18-AM2.png?rlkey=2quywh1kmo67qwwap3f0ql1dc&st=k8a2ljls&raw=1" alt="Mystical Bible Companion Logo">
     <h1>Account Verified!</h1>
     <div class="premium">Welcome to Mystical Bible Companion</div>
-    <p>Your email has been successfully verified.<br>You're now ready to explore a mystical journey through the Bible!</p>
-    <h2>Premium Features Include:</h2>
-    <ul>
-      <li>Unlimited mystical commentary on any passage</li>
-      <li>Bookmark your favorite verses</li>
-      <li>Personalized inspiration and study tools</li>
-      <li>Early access to new features</li>
+    <p class="note">If you are seeing this page, simply open this link on your mobile device with the Mystical Bible Companion app installed. The app should open automatically to complete your password reset.<br>If nothing happens, make sure you have the app installed and try again from your mobile device.<br>If you are on a desktop, please open this email on your phone or tablet.</p>
+    <p style="color:#ffe066;font-size:14px;font-family:serif;margin-top:24px;">Blessings,<br>The Mystical Bible Companion Team</p>
+    <p style="color:#bfae66;font-size:12px;font-family:sans-serif;margin-top:16px;">&copy; 2025 Mystical Bible Companion</p>
+    <script>
+      // Debug message on page
+      function getQueryParam(name) {
+        const url = new URL(window.location.href);
+        let value = url.searchParams.get(name);
+        if (value) return value;
+        if (url.hash) {
+          const hashParams = new URLSearchParams(url.hash.slice(1));
+          value = hashParams.get(name);
+          if (value) return value;
+        }
+        return null;
+      }
+      window.onload = function() {
+        var token = getQueryParam('access_token') || getQueryParam('token') || getQueryParam('refresh_token');
+        var debugDiv = document.createElement('div');
+        debugDiv.style.color = '#bfae66';
+        debugDiv.style.fontSize = '12px';
+        debugDiv.style.marginTop = '20px';
+        if (token) {
+          debugDiv.textContent = 'Token found: ' + token.substring(0,12) + '...';
+        } else {
+          debugDiv.textContent = 'No token found in URL.';
+        }
+        document.querySelector('.container').appendChild(debugDiv);
+      }
+    </script>
       <li>Ad-free, serene experience</li>
     </ul>
     <a class="cta" href="https://play.google.com/store/apps/details?id=com.aialchemist.mysticalbiblecompanion" target="_blank">Open the App</a>
