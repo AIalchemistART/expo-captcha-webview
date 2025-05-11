@@ -1,8 +1,12 @@
 {
   "expo": {
-    "name": "frontend-app",
+    "scheme": "mysticalbible",
+    "deepLinks": [
+      "mysticalbible://*"
+    ],
+    "name": "Mystical Bible Companion",
     "slug": "frontend-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,9 +22,26 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2A004B"
       },
-      "package": "com.aialchemist.mysticalbiblecompanion"
+      "package": "com.aialchemist.mysticalbiblecompanion",
+      "versionCode": 6,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "mysticalbiblecompanion.com",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,16 +56,13 @@
         }
       ]
     ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "eas": {
         "projectId": "93595a6a-8986-4a88-9fd0-b75217451212"
       }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/93595a6a-8986-4a88-9fd0-b75217451212"
     }
   }
 }
