@@ -3,9 +3,9 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "YOUR.ANDROID.PACKAGE.NAME",
+      "package_name": "com.aialchemist.mysticalbiblecompanion",
       "sha256_cert_fingerprints": [
-        "YOUR:SHA256:FINGERPRINT"
+        "5B:52:23:99:E9:58:A8:67:D8:66:ED:53:77:3C:11:16:B7:39:38:AC:82:31:C9:E0:B2:8E:C8:CC:5D:EA:FF:79"
       ]
     }
   }
