@@ -18,7 +18,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     setMessage('');
     // Pass the deep link for password reset
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://aialchemistart.github.io/expo-captcha-webview/reset-redirect.html',
+      redirectTo: 'https://mysticalbiblecompanion.com/reset-redirect.html',
     });
     if (error) {
       setError(error.message);
