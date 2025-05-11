@@ -4,17 +4,41 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MysticalHomeBackground from '../components/MysticalHomeBackground';
 import DevCommentarySync from '../components/DevCommentarySync';
+import DevGetInspired from '../components/DevGetInspired';
+import AboutOverlay, { shouldShowAboutOverlay } from '../components/AboutOverlay';
 import { useAuth } from '../auth/useAuth';
+import * as Notifications from 'expo-notifications';
 
-import { useProfile } from '../auth/useProfile';
+import { useProfile } from '../auth/ProfileProvider';
 
 const HomeScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const { profile } = useProfile();
   const isPremium = !!profile?.is_paid;
   const isLoggedIn = !!user;
-  // Free: not premium (either not logged in, or logged in but not paid)
   const isFree = !isPremium;
+
+  // About overlay state
+  const [showAbout, setShowAbout] = React.useState(false);
+  React.useEffect(() => {
+    let mounted = true;
+    shouldShowAboutOverlay().then((shouldShow) => {
+      if (mounted && shouldShow) setShowAbout(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  // Overlay action handlers
+  const handleAboutDismiss = () => setShowAbout(false);
+  const handleSignIn = () => {
+    setShowAbout(false);
+    navigation.navigate('Premium');
+  };
+  const handleUpgrade = () => {
+    setShowAbout(false);
+    navigation.navigate('Premium');
+  };
+
 
   // --- Dynamic collision logic for Journal button ---
   const { height: windowHeight } = require('react-native').useWindowDimensions();
@@ -27,69 +51,123 @@ const HomeScreen = ({ navigation }) => {
   // --- End dynamic collision logic ---
 
   // Move bottomInset+extraBuffer padding to SafeAreaView (top-level)
+  // Move bottomInset+extraBuffer padding to SafeAreaView (top-level)
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#2A004B', flex: 1, paddingBottom: bottomInset + extraBuffer }]} edges={['top', 'bottom']}>
-      <MysticalHomeBackground />
-      <StatusBar style="light" backgroundColor="transparent" translucent={true} />
-      {/* DEV ONLY: Commentary Sync Utility */}
-      {process.env.EXPO_PUBLIC_DEV_MODE === 'true' && <DevCommentarySync />}
+    <>
+      <AboutOverlay
+        visible={showAbout}
+        onDismiss={handleAboutDismiss}
+        showDontShowToggle={true}
+      >
+        {!isLoggedIn && (
+          <TouchableOpacity style={styles.mysticalButton} onPress={handleSignIn}>
+            <Text style={styles.mysticalButtonText}>Sign In / Sign Up</Text>
+          </TouchableOpacity>
+        )}
+        {isLoggedIn && isFree && (
+          <TouchableOpacity style={styles.mysticalButton} onPress={handleUpgrade}>
+            <Text style={styles.mysticalButtonText}>Upgrade to Premium</Text>
+          </TouchableOpacity>
+        )}
+      </AboutOverlay>
+      <SafeAreaView style={[styles.container, { backgroundColor: '#2A004B', flex: 1, paddingBottom: bottomInset + extraBuffer }]} edges={['top', 'bottom']}>
+        <MysticalHomeBackground />
+        <StatusBar style="light" backgroundColor="transparent" translucent={true} />
+        {/* DEV ONLY: Get Inspired Utility */}
+        {/*
+        {typeof __DEV__ !== 'undefined' && __DEV__ && (
+          <DevGetInspired />
+        )}
+        */}
 
-      <TouchableOpacity
-        style={
-          isLoggedIn && isPremium
-            ? styles.premiumTab
-            : [
-                styles.parchmentPremiumButton,
-                styles.parchmentPremiumButtonSelected,
-              ]
-        }
-        onPress={() => navigation.navigate('Premium')}
-        accessibilityLabel="Go to Premium features, login, and payment"
-      >
-        <Text style={isLoggedIn && isPremium ? styles.premiumTabText : styles.parchmentPremiumText}>
-          Premium
-        </Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Mystical Bible Companion</Text>
-      <Text style={styles.subtitle}>Welcome! Your journey into deeper wisdom begins here.</Text>
-      <View style={styles.buttonContainer}
-        onLayout={e => {
-          const { x, y, width, height } = e.nativeEvent.layout;
-          console.log('[HomeScreen] buttonContainer layout:', { x, y, width, height });
-        }}
-      >
         <TouchableOpacity
-          style={styles.mysticalButton}
-          onPress={() => navigation.navigate('DivineInspiration')}
-          accessibilityLabel="Receive Divine Inspiration"
+          style={
+            isLoggedIn && isPremium
+              ? styles.premiumTab
+              : [
+                  styles.parchmentPremiumButton,
+                  styles.parchmentPremiumButtonSelected,
+                ]
+          }
+          onPress={() => navigation.navigate('Premium')}
+          accessibilityLabel="Go to Premium features, login, and payment"
         >
-          <Text style={styles.mysticalButtonText}>Receive Divine Inspiration</Text>
+          <Text style={isLoggedIn && isPremium ? styles.premiumTabText : styles.parchmentPremiumText}>
+            Premium
+          </Text>
         </TouchableOpacity>
-        <View style={styles.spacer} />
-        <TouchableOpacity
-          style={styles.mysticalButton}
-          onPress={() => navigation.navigate('Bible')}
-          accessibilityLabel="Go to Bible"
-        >
-          <Text style={styles.mysticalButtonText}>Go to Bible</Text>
-        </TouchableOpacity>
-        <View style={styles.spacer} />
-        <TouchableOpacity
-          style={[
-            styles.mysticalButton,
-            styles.journalButton
-          ]}
-          onPress={() => navigation.navigate('Journal')}
-          accessibilityLabel="Go to Journal"
+        <Text style={styles.title}>Mystical Bible Companion</Text>
+        <Text style={styles.subtitle}>Welcome! Your journey into deeper wisdom begins here.</Text>
+        <View style={styles.buttonContainer}
           onLayout={e => {
             const { x, y, width, height } = e.nativeEvent.layout;
-            // console.log('[HomeScreen] GTJ button layout:', { x, y, width, height });
+            console.log('[HomeScreen] buttonContainer layout:', { x, y, width, height });
           }}
         >
-          <Text style={styles.mysticalButtonText}>Go to Journal</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          {/* DEV-ONLY: Trigger notification button */}
+          {/* {process.env.EXPO_PUBLIC_DEV_MODE === 'true' && (
+            <TouchableOpacity
+              style={[styles.mysticalButton, { backgroundColor: '#ff9800' }]}
+              onPress={async () => {
+                try {
+                  console.log('[DEV][HomeScreen] Triggering test notification...');
+                  const id = await Notifications.scheduleNotificationAsync({
+                    content: {
+                      title: 'Test Notification',
+                      body: 'This is a test notification triggered from HomeScreen.',
+                      data: { devTest: true },
+                    },
+                    trigger: { seconds: 1 },
+                  });
+                  console.log('[DEV][HomeScreen] Test notification scheduled! ID:', id);
+                } catch (e) {
+                  console.error('[DEV][HomeScreen] Failed to schedule test notification:', e);
+                }
+              }}
+            >
+              <Text style={styles.mysticalButtonText}>Trigger DEV Notification</Text>
+            </TouchableOpacity>
+          )} */}
+
+          <TouchableOpacity
+            style={styles.mysticalButton}
+            onPress={() => navigation.navigate('DivineInspiration')}
+            accessibilityLabel="Receive Divine Inspiration"
+          >
+            <Text style={styles.mysticalButtonText}>Receive Divine Inspiration</Text>
+          </TouchableOpacity>
+          <View style={styles.spacer} />
+          <TouchableOpacity
+            style={styles.mysticalButton}
+            onPress={() => navigation.navigate('Bible')}
+            accessibilityLabel="Go to Bible"
+          >
+            <Text style={styles.mysticalButtonText}>Go to Bible</Text>
+          </TouchableOpacity>
+          <View style={styles.spacer} />
+          <TouchableOpacity
+            style={[styles.mysticalButton, styles.journalButton]}
+            onPress={() => navigation.navigate('Journal')}
+            accessibilityLabel="Go to Journal"
+            onLayout={e => {
+              const { x, y, width, height } = e.nativeEvent.layout;
+              // console.log('[HomeScreen] GTJ button layout:', { x, y, width, height });
+            }}
+          >
+            <Text style={styles.mysticalButtonText}>Go to Journal</Text>
+          </TouchableOpacity>
+          <View style={{ height: 7 }} />
+          {/* Sacred Sounds Button */}
+          <TouchableOpacity
+            style={[styles.mysticalButton, { minWidth: '38%', paddingHorizontal: 14, paddingVertical: 14 }]}
+            onPress={() => navigation.navigate('SacredSounds')}
+            accessibilityLabel="Go to Sacred Sounds"
+          >
+            <Text style={styles.mysticalButtonText}>Sacred Sounds</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </>
   );
 }
 

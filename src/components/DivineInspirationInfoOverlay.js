@@ -121,7 +121,9 @@ export default function DivineInspirationInfoOverlay({
               style={{ backgroundColor: '#eee7d7', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 28, borderWidth: 1, borderColor: '#bfae66', minWidth: 180, alignItems: 'center' }}
               onPress={handleGetInspired}
             >
-              <Text style={{ color: '#7d5fff', fontWeight: 'bold', fontSize: 17, fontFamily: 'serif', textAlign: 'center' }}>Maybe Later</Text>
+              <Text style={{ color: '#7d5fff', fontWeight: 'bold', fontSize: 17, fontFamily: 'serif', textAlign: 'center' }}>
+                {isLoggedIn && isPremium ? "Let's Go!" : 'Maybe Later'}
+              </Text>
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18 }}>
               <Switch

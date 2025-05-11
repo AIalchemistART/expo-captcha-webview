@@ -81,7 +81,7 @@ const BOOKS = [
 const BibleScreen = ({ navigation }) => {
   const { user } = useAuth();
   // Add profile context for premium gating
-  const { profile } = require('../auth/useProfile').useProfile();
+  const { profile } = require('../auth/ProfileProvider').useProfile();
   const isPremium = !!profile?.is_paid;
   const isLoggedIn = !!user;
   // Overlay/modal state for upgrade info
@@ -167,12 +167,14 @@ const BibleScreen = ({ navigation }) => {
       willFetch: (!isLoggedIn || isPremium || isAllowedFree)
     });
   }
-  const {
-    commentary,
-    loading: commentaryLoading,
-    error: commentaryError,
-    refresh: refreshCommentary
-  } = useCommentary(
+  // [DIAG] About to call useCommentary with:
+console.log('[BibleScreen][DIAG] useCommentary call:', { book, chapter, verse, passageRange });
+const {
+  commentary,
+  loading: commentaryLoading,
+  error: commentaryError,
+  refresh: refreshCommentary
+} = useCommentary(
     // Only allow commentary fetch if:
     // - Not logged in (free/guest: can only get Genesis 1 & Matthew 1 anyway)
     // - Premium
@@ -183,6 +185,7 @@ const BibleScreen = ({ navigation }) => {
     commentaryRequested && (
       !isLoggedIn || isPremium || isAllowedFree
     ) ? chapter : null,
+    // Always pass the full passageRange object for commentary
     commentaryRequested && (
       !isLoggedIn || isPremium || isAllowedFree
     ) ? verse : null,
@@ -698,23 +701,35 @@ const maxHeight = Math.max(minHeight, Math.min(available, staticMaxHeight));
         ) : (
         <View style={styles.modalOverlay}>
           {console.log('[BibleScreen] Commentary object for BookmarkToggle:', commentary, 'commentaryId:', commentary && typeof commentary === 'object' && commentary.id ? commentary.id : null)}
-          <BookmarkToggle
-            anchor={{
-              book,
-              chapter,
-              startVerse: selectedRange ? Math.min(selectedRange.start, selectedRange.end) : verse,
-              endVerse: selectedRange ? Math.max(selectedRange.start, selectedRange.end) : verse
-            }}
-            commentary={typeof commentary === 'string' ? commentary : (commentary?.commentary || '')}
-            commentaryId={commentary && typeof commentary === 'object' && commentary.id ? commentary.id : null}
-            style={{ position: 'absolute', top: 23, right: 23, zIndex: 20 }}
-            iconColorActive="#2A004B"
-            iconColorInactive="#2A004B"
-            iconColorDefault="#2A004B"
-            isPremium={isPremium}
-            isAllowedFree={isAllowedFree}
-            onPremiumBlock={() => setShowBookmarkPremiumOverlay(true)}
-          />
+          {console.log('[BibleScreen][LOG] About to render BookmarkToggle with:', {
+  passageRange,
+  selectedRange,
+  verse,
+  anchor: {
+    book,
+    chapter,
+    startVerse: passageRange.startVerse,
+    endVerse: passageRange.endVerse
+  },
+  commentary
+})}
+<BookmarkToggle
+  anchor={{
+    book,
+    chapter,
+    startVerse: passageRange.startVerse,
+    endVerse: passageRange.endVerse
+  }}
+  commentary={commentary}
+  commentaryId={commentary && typeof commentary === 'object' && commentary.id ? commentary.id : null}
+  style={{ position: 'absolute', top: 23, right: 23, zIndex: 20 }}
+  iconColorActive="#2A004B"
+  iconColorInactive="#2A004B"
+  iconColorDefault="#2A004B"
+  isPremium={isPremium}
+  isAllowedFree={isAllowedFree}
+  onPremiumBlock={() => setShowBookmarkPremiumOverlay(true)}
+/>
           <View style={[styles.modalContent, {flexDirection: 'column', justifyContent: 'space-between'}]}>
             <ScrollWornEdgesCommentary style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', zIndex: 0 }} width={340} height={510} />
             <VignetteBackground borderRadius={22} />

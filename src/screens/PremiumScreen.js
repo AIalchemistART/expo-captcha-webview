@@ -3,6 +3,7 @@ import * as Sentry from 'sentry-expo';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Button } from 'react-native';
 import AboutOverlay from '../components/AboutOverlay';
+import EmailChangeInfoOverlay from '../components/EmailChangeInfoOverlay';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MysticalHomeBackground from '../components/MysticalHomeBackground';
 import { useAuth } from '../auth/useAuth';
@@ -13,11 +14,83 @@ import LogoutButton from '../auth/LogoutButton';
 import ChangeEmailScreen from '../auth/ChangeEmailScreen';
 
 export default function PremiumScreen({ navigation }) {
-  const { profile, setProfile } = useProfile();
+  const { profile, setProfile, user, authReady } = useProfile();
+  const [latestEmail, setLatestEmail] = React.useState(user?.email || '');
+
+  React.useEffect(() => {
+    let isMounted = true;
+    async function fetchLatestEmail() {
+      if (user?.id) {
+        try {
+          const supabase = require('../services/supabaseClient').supabase;
+          const { data, error } = await supabase.auth.getUser();
+          if (!error && data?.user?.email && isMounted) {
+            setLatestEmail(data.user.email);
+          }
+        } catch (err) {
+          if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+            Sentry.captureException(err);
+          }
+        }
+      }
+    }
+    fetchLatestEmail();
+    return () => { isMounted = false; };
+  }, [user?.id, showChangeEmail]);
+  // Context/state debug logs
+  console.log('[PremiumScreen] MOUNT user:', user, 'profile:', profile, 'authReady:', authReady, new Error().stack);
+  // ...rest of component
   const [showAbout, setShowAbout] = useState(false);
   // ...existing hooks...
   const [restoring, setRestoring] = useState(false);
   // REMOVE any local profile/setProfile state! Only use context version.
+
+  // Change Email modal state
+  const [showChangeEmail, setShowChangeEmail] = useState(false);
+  const [showEmailChangeInfoOverlay, setShowEmailChangeInfoOverlay] = useState(false);
+
+  // Log every state change
+  React.useEffect(() => {
+    console.log('[PremiumScreen] showChangeEmail state changed:', showChangeEmail, new Error().stack);
+  }, [showChangeEmail]);
+
+  // Log ChangeEmailScreen modal open/close
+  const openChangeEmail = () => {
+    setShowChangeEmail(true);
+    console.log('[PremiumScreen] Opening ChangeEmailScreen modal', new Error().stack);
+  };
+  const closeChangeEmail = () => {
+    setShowChangeEmail(false);
+    setTimeout(() => {
+      console.log('[PremiumScreen] Showing EmailChangeInfoOverlay after cancel');
+      setShowEmailChangeInfoOverlay(true);
+    }, 300);
+    console.log('[PremiumScreen] Closing ChangeEmailScreen modal', new Error().stack);
+  };
+
+  React.useEffect(() => {
+    if (showChangeEmail) {
+      console.log('[PremiumScreen] ChangeEmailScreen modal is open');
+    }
+  }, [showChangeEmail]);
+
+  // Log ChangeEmailScreen render
+  console.log('[PremiumScreen] Rendering ChangeEmailScreen');
+
+  // Elegant loading spinner for restore
+  const renderRestoreLoader = () => (
+    restoring ? (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(44,0,75,0.35)', zIndex: 1000, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+        <View style={{ backgroundColor: '#fffbe6', padding: 24, borderRadius: 16, alignItems: 'center', shadowColor: '#ffe066', shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 }}>
+          <Text style={{ color: '#bfae66', fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Restoring your purchase...</Text>
+          <View style={{ marginTop: 12 }}>
+            <View style={{ width: 44, height: 44, borderWidth: 4, borderColor: '#ffe066', borderRadius: 22, borderTopColor: '#bfae66', borderRightColor: '#bfae66', borderBottomColor: 'transparent', borderLeftColor: 'transparent', transform: [{ rotate: '45deg' }], marginBottom: 8 }} />
+          </View>
+        </View>
+      </View>
+    ) : null
+  );
+
 
   // Restore purchase handler
   async function handleRestore() {
@@ -29,48 +102,77 @@ export default function PremiumScreen({ navigation }) {
     setRestoring(true);
     setError(null);
     try {
-      // Try to restore purchases via iapService
       const restored = await iapService.restorePurchases?.();
-      // If restorePurchases is not implemented, fallback to re-initialize IAP
-      if (!restored) {
-        // Fetch profile from Supabase
-        if (setProfile) {
-          const supabase = require('../services/supabaseClient').supabase;
-          supabase.auth.getUser().then(({ data, error }) => {
-            if (data && data.user) {
-              supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', data.user.id)
-                .single()
-                .then(({ data: profileData, error: profileError }) => {
-                  if (!profileError && profileData) {
-                    setProfile(profileData);
-                  }
-                });
-            }
-          });
+      // Always fetch the latest profile from Supabase after restore
+      try {
+        const supabase = require('../services/supabaseClient').supabase;
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (profileData) {
+          setProfile(profileData);
+        } else if (profileError) {
+          console.warn('[Restore] Profile fetch error after restore:', profileError);
+          if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+            Sentry.captureException(profileError);
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('[Restore] Exception fetching profile after restore:', fetchErr);
+        if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+          Sentry.captureException(fetchErr);
         }
       }
-      setRestoring(false);
+
+      // If the restore result contains a profile, update global context for instant UI update
+      if (restored && restored.profile) {
+        setProfile(restored.profile);
+      }
+
+      // If restorePurchases is not implemented, fallback to re-initialize IAP
+      if (!restored) {
+        const supabase = require('../services/supabaseClient').supabase;
+        supabase.auth.getUser().then(({ data, error }) => {
+          if (data && data.user) {
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', data.user.id)
+              .single()
+              .then(({ data: profileData, error: profileError }) => {
+                if (!profileError && profileData) {
+                  setProfile(profileData);
+                }
+              });
+          }
+        });
+      }
+      // Wait for profile to update before hiding loader
+      setTimeout(() => {
+        setRestoring(false);
+      }, 700);
     } catch (err) {
       setRestoring(false);
       if (err?.message && /invalid hook call/i.test(err.message)) {
-  console.error('[PremiumScreen] Suppressed error:', err);
-  if (typeof Sentry !== 'undefined' && Sentry.captureException) {
-    Sentry.captureException(err);
-  }
-} else {
-  setError(err?.message || 'Restore failed. Please try again.');
-}
+        console.error('[PremiumScreen] Suppressed error:', err);
+        if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+          Sentry.captureException(err);
+        }
+      } else {
+        setError(err?.message || 'Restore failed. Please try again.');
+        if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+          Sentry.captureException(err);
+        }
+      }
     }
   }
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const [showLogin, setShowLogin] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showChangeEmail, setShowChangeEmail] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
+  const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
   // Use profile context to determine premium status
   const isPaid = !!profile?.is_paid;
 
@@ -85,7 +187,7 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
   React.useEffect(() => {
     let isMounted = true;
     // Show upgrade modal automatically for non-premium users, but only if not dismissed
-    if (profileUser && !isPaid && !showUpgradeModal && !showSuccess && !dismissedUpgradeModal) {
+    if (user && !isPaid && !showUpgradeModal && !showSuccess && !dismissedUpgradeModal) {
       setShowUpgradeModal(true);
     }
     // Only setup IAP when auth is ready
@@ -97,8 +199,6 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
       setLoading(true);
       setError(null);
       try {
-        console.log('[PremiumScreen] iapService:', iapService);
-        console.log('[PremiumScreen] iapService.productIds:', iapService.productIds, 'type:', typeof iapService.productIds, 'length:', iapService.productIds?.length);
         if (!Array.isArray(iapService.productIds) || iapService.productIds.length === 0) {
           const errMsg = `[PremiumScreen] FATAL: iapService.productIds is not a non-empty array: ${JSON.stringify(iapService.productIds)} (type: ${typeof iapService.productIds})`;
           if (typeof Sentry !== 'undefined' && Sentry.captureException) {
@@ -110,11 +210,11 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
         const prods = await iapService.getProducts();
         if (isMounted) setProducts(prods);
         // Use a ref to always get latest user in getter
-        const userRef = React.useRef(profileUser);
+        const userRef = React.useRef(user);
         React.useEffect(() => {
-          userRef.current = profileUser;
-        }, [profileUser]);
-        console.log('[PremiumScreen] Setting up IAP listener with profileUser:', profileUser, 'authReady:', authReady);
+          userRef.current = user;
+        }, [user]);
+        console.log('[PremiumScreen] Setting up IAP listener with user:', user, 'authReady:', authReady);
         iapService.setPurchaseListener(
           async (purchase) => {
             setLoading(false);
@@ -138,34 +238,40 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
           (err) => {
             setLoading(false);
             if (err?.message && /invalid hook call/i.test(err.message)) {
-  console.error('[PremiumScreen] Suppressed error:', err);
-  if (typeof Sentry !== 'undefined' && Sentry.captureException) {
-    Sentry.captureException(err);
-  }
-} else {
-  setError(err?.message || 'Purchase failed');
-}
+              console.error('[PremiumScreen] Suppressed error:', err);
+              if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+                Sentry.captureException(err);
+              }
+            } else {
+              setError(err?.message || 'Purchase failed');
+              if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+                Sentry.captureException(err);
+              }
+            }
           },
           () => {
             const userVal = userRef.current;
-            console.log('[PremiumScreen] Getter called for user. userRef.current:', userVal);
+            // console.log('[PremiumScreen] Getter called for user. userRef.current:', userVal);
             return userVal;
           },
           () => {
-            console.log('[PremiumScreen] Getter called for authReady. authReady:', authReady);
+            // console.log('[PremiumScreen] Getter called for authReady. authReady:', authReady);
             return authReady;
           }
         );
       } catch (err) {
         setLoading(false);
         if (err?.message && /invalid hook call/i.test(err.message)) {
-  console.error('[PremiumScreen] Suppressed error:', err);
-  if (typeof Sentry !== 'undefined' && Sentry.captureException) {
-    Sentry.captureException(err);
-  }
-} else {
-  setError(err?.message || 'IAP setup error');
-}
+          console.error('[PremiumScreen] Suppressed error:', err);
+          if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+            Sentry.captureException(err);
+          }
+        } else {
+          setError(err?.message || 'IAP setup error');
+          if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+            Sentry.captureException(err);
+          }
+        }
       }
       setLoading(false);
     }
@@ -174,7 +280,7 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
       isMounted = false;
       iapService.endIAP();
     };
-  }, [authReady, profileUser, isPaid, showUpgradeModal, showSuccess]);
+  }, [authReady, user, isPaid, showUpgradeModal, showSuccess]);
 
   async function handlePurchase() {
     if (!user) {
@@ -213,6 +319,9 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
         }
       } else {
         setError(err?.message || 'Purchase error');
+        if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+          Sentry.captureException(err);
+        }
       }
     }
   }
@@ -310,7 +419,7 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
 
       {user && (
         <View style={styles.mysticalWelcomeBanner}>
-          <Text style={styles.mysticalWelcomeText}>Welcome{user?.email ? `, ${user.email}` : ''}! You are now logged in.</Text>
+          <Text style={styles.mysticalWelcomeText}>Welcome{latestEmail ? `, ${latestEmail}` : ''}! You are now logged in.</Text>
         </View>
       )}
       {!user && !showSuccess && (
@@ -374,10 +483,28 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
           {error && <Text style={{ color: 'red', marginBottom: 10 }} accessibilityRole="alert">{error}</Text>}
           {showChangeEmail ? (
             <>
-              <ChangeEmailScreen onSuccess={() => setShowChangeEmail(false)} />
+              {console.log('[PremiumScreen] Rendering ChangeEmailScreen', {
+                 onSuccess: () => {
+                   setShowChangeEmail(false);
+                   setTimeout(() => {
+                     console.log('[PremiumScreen] Setting showEmailChangeInfoOverlay to true after email change');
+                     setShowEmailChangeInfoOverlay(true);
+                   }, 500);
+                 },
+                 showChangeEmail,
+                 parentUser: user,
+                 parentProfile: profile,
+                 authReady,
+                 stack: new Error().stack
+               })}
+              <ChangeEmailScreen
+                onSuccess={() => {
+                   setShowChangeEmail(false);
+                 }}
+              />
               <TouchableOpacity
                 style={styles.mysticalButtonCancelChangeEmail}
-                onPress={() => setShowChangeEmail(false)}
+                onPress={closeChangeEmail}
                 accessibilityRole="button"
               >
                 <Text style={[styles.mysticalButtonAltText, { textAlign: 'center' }]}>Cancel</Text>
@@ -392,15 +519,45 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
               >
                 <Text style={[styles.mysticalButtonAltText, { textAlign: 'center' }]}>Change Email</Text>
               </TouchableOpacity>
-              {!showChangeEmail && (
-                <TouchableOpacity
-                  style={[styles.mysticalButton, styles.mysticalButtonLogout]}
-                  onPress={logout}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.mysticalButtonText}>Logout</Text>
-                </TouchableOpacity>
-              )}
+              {/* Logout button only when ChangeEmailScreen is NOT open */}
+              <TouchableOpacity
+                style={[styles.mysticalButton, { marginTop: 8, marginBottom: 8 }]}
+                onPress={async () => {
+                    console.log('[PremiumScreen] Logout button pressed');
+                    try {
+                      const { error } = await require('../services/supabaseClient').supabase.auth.signOut();
+                      console.log('[PremiumScreen] supabase.auth.signOut() called, error:', error);
+                      if (error) {
+                        if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+                          Sentry.captureException(error);
+                        }
+                      }
+                      if (typeof require('../auth/useAuth').useAuth === 'function') {
+                        const { setUser } = require('../auth/useAuth').useAuth();
+                        setUser(null);
+                        console.log('[PremiumScreen] setUser(null) called');
+                      } else {
+                        console.log('[PremiumScreen] useAuth is not a function');
+                      }
+                      if (navigation && typeof navigation.navigate === 'function') {
+                        navigation.navigate('Login');
+                        console.log('[PremiumScreen] navigation.navigate("Login") called');
+                      } else {
+                        console.log('[PremiumScreen] navigation.navigate is not a function');
+                      }
+                      // Force state update to trigger re-render
+                      setDummyState && setDummyState(Date.now());
+                    } catch (e) {
+                      console.log('[PremiumScreen] Logout error:', e);
+                      if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+                        Sentry.captureException(e);
+                      }
+                    }
+                }}
+                accessibilityRole="button"
+              >
+                <Text style={styles.mysticalButtonText}>Logout</Text>
+              </TouchableOpacity>
             </>
           )}
         </>
@@ -418,14 +575,16 @@ const [dismissedUpgradeModal, setDismissedUpgradeModal] = useState(false);
           </TouchableOpacity>
           {/* AboutOverlay Modal */}
           <AboutOverlay visible={showAbout} onDismiss={() => setShowAbout(false)} showDontShowToggle={false} />
-          <TouchableOpacity
-            style={[styles.mysticalButton, styles.mysticalButtonLogout]}
-            onPress={logout}
-            accessibilityRole="button"
-          >
-            <Text style={styles.mysticalButtonText}>Logout</Text>
-          </TouchableOpacity>
         </>
+      )}
+
+      {/* EmailChangeInfoOverlay Modal - always available for all users */}
+      {showEmailChangeInfoOverlay && (
+        (console.log('[PremiumScreen] Rendering EmailChangeInfoOverlay'), null)
+        || <EmailChangeInfoOverlay
+          visible={showEmailChangeInfoOverlay}
+          onDismiss={() => setShowEmailChangeInfoOverlay(false)}
+        />
       )}
       </View>
     </SafeAreaView>

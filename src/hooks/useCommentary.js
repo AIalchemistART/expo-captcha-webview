@@ -5,12 +5,15 @@ import apiConfig from '../config/api';
 
 // --- Robust logging for Supabase config ---
 // console.log('[Supabase Config] URL:', process.env.EXPO_PUBLIC_SUPABASE_URL);
+// [PRODUCTION] Do not log anon key presence. (Debug only)
 // console.log('[Supabase Config] Anon Key present:', !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
 
 
 /**
  * Custom React hook to fetch and cache mystical commentary for a given passage.
  * Checks local storage first, then Supabase if not found. Caches results locally for offline use.
+ *
+ * [PRODUCTION] Do not log session payloads, anon keys, or user info. All such logs must be commented or routed to Sentry.
  *
  * @param {string} book - Book name (e.g., 'Genesis')
  * @param {number} chapter - Chapter number
@@ -34,10 +37,13 @@ export function useCommentary(book, chapter, verse, passageRange) {
   if (passageRange && typeof passageRange.startVerse === 'number') startVerse = passageRange.startVerse;
   if (passageRange && typeof passageRange.endVerse === 'number') endVerse = passageRange.endVerse;
   if (passageRange && passageRange.anchorVerse !== undefined) anchorVerseParam = passageRange.anchorVerse;
-  else if (typeof verse === 'number' && !isNaN(verse)) {
+  else if (!passageRange && typeof verse === 'number' && !isNaN(verse)) {
     startVerse = verse;
     endVerse = verse;
   }
+  // Enhanced logging for debugging passage range issues
+  console.log('[useCommentary][ENHANCED DIAG] Input args:', { book, chapter, verse, passageRange });
+  console.log('[useCommentary][ENHANCED DIAG] Computed startVerse/endVerse:', { startVerse, endVerse });
 
   // Defensive: Ensure startVerse and endVerse are always valid integers
   if (typeof startVerse !== 'number' || isNaN(startVerse)) {
@@ -105,17 +111,32 @@ export function useCommentary(book, chapter, verse, passageRange) {
       }
       cached = await AsyncStorage.getItem(keyPassage);
       if (cached) {
-        console.log('[INTERNAL TEST][Cache Hit] Found commentary in AsyncStorage (passage).');
-        setCommentary(JSON.parse(cached));
-        setLoading(false);
-        return;
+        const commentaryObj = JSON.parse(cached);
+        // Only use the cache if it matches the requested range exactly
+        if (
+          commentaryObj.startVerse === startVerse &&
+          commentaryObj.endVerse === endVerse
+        ) {
+          console.log('[INTERNAL TEST][Cache Hit] Found commentary in AsyncStorage (passage, exact match).');
+          setCommentary(commentaryObj);
+          setLoading(false);
+          return;
+        } else {
+          console.log('[INTERNAL TEST][Cache Hit] Found commentary in AsyncStorage (passage), but range did not match. Ignoring.');
+        }
       }
-      cached = await AsyncStorage.getItem(keySingle);
-      if (cached) {
-        console.log('[INTERNAL TEST][Cache Hit] Found commentary in AsyncStorage (single).');
-        setCommentary(JSON.parse(cached));
-        setLoading(false);
-        return;
+      // Only use single-verse cache if the request is for a single verse
+      if (startVerse === endVerse) {
+        cached = await AsyncStorage.getItem(keySingle);
+        if (cached) {
+          const commentaryObj = JSON.parse(cached);
+          if (commentaryObj.startVerse === startVerse && commentaryObj.endVerse === endVerse) {
+            console.log('[INTERNAL TEST][Cache Hit] Found commentary in AsyncStorage (single, exact match).');
+            setCommentary(commentaryObj);
+            setLoading(false);
+            return;
+          }
+        }
       }
     } catch (err) {
       console.log('[useCommentary] AsyncStorage error:', err);
@@ -172,17 +193,30 @@ export function useCommentary(book, chapter, verse, passageRange) {
       return;
     }
     if (supaData && supaData.commentary) {
-      console.log('[INTERNAL TEST][Supabase Hit] Found commentary in Supabase.');
-      setCommentary(supaData.commentary);
-      // Cache in local storage
-      try {
-        await AsyncStorage.setItem(keyPassageAnchor || keyPassage, JSON.stringify(supaData.commentary));
-        console.log('[useCommentary] Saved commentary from Supabase to AsyncStorage:', keyPassageAnchor || keyPassage, supaData.commentary);
-      } catch (err) {
-        console.log('[useCommentary] Failed to save commentary from Supabase to AsyncStorage:', err);
+      // Defensive: Only accept if start_verse/end_verse match the requested range
+      const commentaryObj = supaData.commentary;
+      // Commentary may be a string or an object, so check for object shape
+      const commentaryStart = commentaryObj.startVerse ?? commentaryObj.start_verse;
+      const commentaryEnd = commentaryObj.endVerse ?? commentaryObj.end_verse;
+      if (
+        commentaryStart === startVerse &&
+        commentaryEnd === endVerse
+      ) {
+        console.log('[INTERNAL TEST][Supabase Hit] Found commentary in Supabase (exact match).');
+        setCommentary(commentaryObj);
+        // Cache in local storage
+        try {
+          await AsyncStorage.setItem(keyPassageAnchor || keyPassage, JSON.stringify(commentaryObj));
+          console.log('[useCommentary] Saved commentary from Supabase to AsyncStorage:', keyPassageAnchor || keyPassage, commentaryObj);
+        } catch (err) {
+          console.log('[useCommentary] Failed to save commentary from Supabase to AsyncStorage:', err);
+        }
+        setLoading(false);
+        return;
+      } else {
+        console.log('[INTERNAL TEST][Supabase Hit] Commentary in Supabase did not match requested range. Ignoring.');
+        // Continue to OpenAI fallback
       }
-      setLoading(false);
-      return;
     }
     console.log('[INTERNAL TEST][Supabase Miss] No commentary found in Supabase, will attempt OpenAI API fallback.');
 
@@ -235,9 +269,39 @@ export function useCommentary(book, chapter, verse, passageRange) {
       }
       console.log('[useCommentary][DIAG] Received commentary from backend:', data);
       setCommentary(data);
-      await AsyncStorage.setItem(keyPassageAnchor || keyPassage, JSON.stringify(data));
-      setLoading(false);
-      // Optionally: insert into Supabase for global cache here if needed
+await AsyncStorage.setItem(keyPassageAnchor || keyPassage, JSON.stringify(data));
+// --- Patch: Upsert commentary to Supabase and log results ---
+try {
+  // --- DEBUG: Log Supabase session and user before upsert ---
+  const sessionResult = await supabase.auth.getSession();
+  // [PRODUCTION] Do not log session payloads. Commented for production safety.
+  // console.log('[DEBUG] Supabase session at upsert:', sessionResult?.data?.session);
+  // [PRODUCTION] Do not log user/session payloads. Commented for production safety.
+  // console.log('[DEBUG] Supabase user at upsert:', sessionResult?.data?.session?.user);
+  // Build upsert object using the backend response and lookup params
+  const upsertObj = {
+    book,
+    chapter,
+    start_verse: (typeof data.startVerse === 'number' && !isNaN(data.startVerse)) ? data.startVerse : startVerse,
+    end_verse: (typeof data.endVerse === 'number' && !isNaN(data.endVerse)) ? data.endVerse : endVerse,
+    commentary: data.commentary,
+    is_reviewed: false,
+    ...(data.s3_urls ? { s3_urls: data.s3_urls } : {}),
+    ...(anchorVerseParam !== null && anchorVerseParam !== undefined ? { anchor_verse: anchorVerseParam } : {})
+  };
+  const { data: upsertData, error: upsertError } = await supabase
+    .from('commentaries')
+    .upsert([upsertObj], { onConflict: ['book', 'chapter', 'start_verse', 'end_verse'] });
+  if (upsertError) {
+    console.error('[Supabase Commentary Upsert Error]', upsertError);
+  } else {
+    console.log('[Supabase Commentary Upserted]', upsertData);
+  }
+} catch (upsertCatchErr) {
+  console.error('[Supabase Commentary Upsert Exception]', upsertCatchErr);
+}
+setLoading(false);
+// --- End patch ---
     } catch (openAiErr) {
       // Enhanced error diagnostics
       console.error('[INTERNAL TEST 003][OpenAI API] Error during OpenAI API call:', openAiErr);

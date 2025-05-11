@@ -1,51 +1,149 @@
 // ChangeEmailScreen.js
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from './useAuth';
+import EmailChangeInfoOverlay from '../components/EmailChangeInfoOverlay';
+
+console.log('[ChangeEmailScreen] File loaded. React version:', React.version, 'React import:', React, 'React Native import:', View ? 'ok' : 'fail');
+console.log('[ChangeEmailScreen] supabase import:', typeof supabase, 'useAuth import:', typeof useAuth);
 
 export default function ChangeEmailScreen({ onSuccess }) {
+  console.log('[ChangeEmailScreen] MOUNT - is default export, props:', { onSuccess });
+  // Check if React in this scope matches global React
+  if (typeof global !== 'undefined' && global.React) {
+    console.log('[ChangeEmailScreen] React identity match:', React === global.React);
+  }
+
+  console.log('[ChangeEmailScreen] Before useAuth');
   const { user, setUser } = useAuth();
+  console.log('[ChangeEmailScreen] After useAuth', { user, setUser });
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [showInfoOverlay, setShowInfoOverlay] = useState(false);
+  const overlayKeyRef = useRef(0);
+  console.log('[ChangeEmailScreen] RENDER overlayKeyRef:', overlayKeyRef.current, 'showInfoOverlay:', showInfoOverlay);
+  console.log('[ChangeEmailScreen] RENDER loading:', loading, 'button disabled:', loading);
+
+  console.log('[ChangeEmailScreen] After useState hooks');
 
   const handleChangeEmail = async () => {
+    console.log('[ChangeEmailScreen] handleChangeEmail CALLED');
+    console.log('[ChangeEmailScreen] handleChangeEmail START', { user, newEmail, passwordPresent: !!password });
+    console.log('[ChangeEmailScreen] handleChangeEmail called', { user, newEmail, passwordPresent: !!password });
     setLoading(true);
     setError('');
     setMessage('');
+    // Early return if no user
+    if (!user) {
+      console.log('[ChangeEmailScreen] EARLY RETURN: No user');
+      setError('You must be logged in to change your email.');
+      setLoading(false);
+      return;
+    }
+    // Early return if no new email
+    if (!newEmail) {
+      console.log('[ChangeEmailScreen] EARLY RETURN: No new email');
+      setError('Please enter a new email address.');
+      setLoading(false);
+      return;
+    }
+    // Early return if no password
+    if (!password) {
+      console.log('[ChangeEmailScreen] EARLY RETURN: No password');
+      setError('Please enter your password to confirm.');
+      setLoading(false);
+      return;
+    }
     try {
       // Supabase requires re-authentication for sensitive changes
-      const { error: loginError } = await supabase.auth.signInWithPassword({ email: user.email, password });
+      console.log('[ChangeEmailScreen] Attempting signInWithPassword', { email: user?.email });
+      const { error: loginError, data: loginData } = await supabase.auth.signInWithPassword({ email: user.email, password });
+      console.log('[ChangeEmailScreen] signInWithPassword result', { loginError, loginData });
       if (loginError) {
         setError('Incorrect password.');
         setLoading(false);
+        console.log('[ChangeEmailScreen] Incorrect password error:', loginError);
+        console.log('[ChangeEmailScreen] EARLY RETURN after incorrect password');
         return;
       }
-      const { error } = await supabase.auth.updateUser({ email: newEmail });
-      if (error) {
-        setError(error.message);
+      console.log('[ChangeEmailScreen] Attempting updateUser', { newEmail });
+      const { error: updateError, data: updateData } = await supabase.auth.updateUser({ email: newEmail });
+      console.log('[ChangeEmailScreen] updateUser result', { updateError, updateData });
+      if (updateError) {
+        setError(updateError.message);
+        setLoading(false);
+        console.log('[ChangeEmailScreen] updateUser error:', updateError);
+        console.log('[ChangeEmailScreen] EARLY RETURN after updateUser error');
       } else {
-        setMessage('Confirmation email sent to new address. Please confirm to complete the change.');
-        if (onSuccess) onSuccess();
+        console.log('[ChangeEmailScreen] updateUser SUCCESS branch entered');
+        setMessage('Check your inboxes!\n\nFor security, Supabase sends confirmation links to BOTH your old and new email addresses. You must confirm BOTH emails to complete the change.\n\nOpen the links in both emails to finish updating your email address.');
+        console.log('[ChangeEmailScreen] About to trigger overlay. overlayKeyRef before:', overlayKeyRef.current, 'showInfoOverlay before:', showInfoOverlay);
+        overlayKeyRef.current += 1;
+        setShowInfoOverlay(true);
+        console.log('[ChangeEmailScreen] setShowInfoOverlay(true) called. overlayKeyRef after:', overlayKeyRef.current, 'showInfoOverlay after:', true);
+        setLoading(false);
+        // Do not reset state or call onSuccess here; wait until overlay is dismissed
+        console.log('[ChangeEmailScreen] Email update initiated successfully, waiting for overlay dismissal.');
       }
     } catch (e) {
       setError('Unexpected error: ' + (e.message || e.toString()));
+      setLoading(false);
+      console.log('[ChangeEmailScreen] Unexpected error:', e);
+      console.log('[ChangeEmailScreen] EARLY RETURN after catch block');
     }
-    setLoading(false);
+    console.log('[ChangeEmailScreen] handleChangeEmail finished');
   };
 
+  React.useEffect(() => {
+    console.log('[ChangeEmailScreen] useEffect (mount/reset)');
+    setNewEmail('');
+    setPassword('');
+    setError('');
+    setMessage('');
+    setLoading(false);
+    setShowInfoOverlay(false);
+    overlayKeyRef.current = 0;
+    console.log('[ChangeEmailScreen] STATE RESET on mount or open');
+    return () => {
+      console.log('[ChangeEmailScreen] useEffect (unmount)');
+    };
+  }, [onSuccess]);
+
   return (
-    <View style={styles.changeEmailContainer}>
-      <Text style={styles.changeEmailTitle}>Change Email Address</Text>
+    <>
+      {/* Only render the overlay when visible to avoid blocking touch events */}
+      {showInfoOverlay && (
+        <EmailChangeInfoOverlay
+          key={overlayKeyRef.current}
+          visible={showInfoOverlay}
+          onDismiss={() => {
+            console.log('[ChangeEmailScreen] Overlay dismissed, overlayKeyRef:', overlayKeyRef.current);
+            setShowInfoOverlay(false);
+            // After overlay is dismissed, trigger onSuccess and reset state
+            if (onSuccess) onSuccess();
+            setNewEmail('');
+            setPassword('');
+            setError('');
+            setMessage('');
+            setLoading(false);
+          }}
+        />
+      )}
+      <View style={styles.changeEmailContainer}>
+        <Text style={styles.changeEmailTitle}>Change Email Address</Text>
       <TextInput
         style={styles.changeEmailInput}
         placeholder="New Email"
         autoCapitalize="none"
         value={newEmail}
-        onChangeText={setNewEmail}
+        onChangeText={val => {
+          setNewEmail(val);
+          console.log('[ChangeEmailScreen] New email input changed:', val);
+        }}
         keyboardType="email-address"
         placeholderTextColor="#bfae66"
       />
@@ -54,20 +152,28 @@ export default function ChangeEmailScreen({ onSuccess }) {
         placeholder="Current Password"
         secureTextEntry
         value={password}
-        onChangeText={setPassword}
+        onChangeText={val => {
+          setPassword(val);
+          console.log('[ChangeEmailScreen] Password input changed:', val ? '[REDACTED]' : '');
+        }}
         placeholderTextColor="#bfae66"
       />
-      {error ? <Text style={styles.changeEmailError}>{error}</Text> : null}
-      {message ? <Text style={styles.changeEmailSuccess}>{message}</Text> : null}
+      {error ? (() => { console.log('[ChangeEmailScreen] Error displayed:', error); return <Text style={styles.changeEmailError}>{error}</Text>; })() : null}
+      {message ? (() => { console.log('[ChangeEmailScreen] Success message displayed:', message); return <Text style={styles.changeEmailSuccess}>{message}</Text>; })() : null}
       <TouchableOpacity
         style={[styles.changeEmailButton, loading && styles.changeEmailButtonDisabled]}
-        onPress={handleChangeEmail}
+        onPress={() => {
+          console.log('[ChangeEmailScreen] BUTTON onPress fired', { newEmail, passwordPresent: !!password });
+          console.log('[ChangeEmailScreen] BUTTON onPress fired', { newEmail, passwordPresent: !!password });
+          handleChangeEmail();
+        }}
         disabled={loading}
         accessibilityRole="button"
       >
         <Text style={styles.changeEmailButtonText}>{loading ? 'Updating...' : 'Update Email'}</Text>
       </TouchableOpacity>
-    </View>
+      </View>
+    </>
   );
 }
 

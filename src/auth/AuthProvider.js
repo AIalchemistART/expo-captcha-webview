@@ -21,13 +21,15 @@ export const AuthProvider = ({ children }) => {
     // });
     supabase.auth.getSession().then((result) => {
       const session = result?.data?.session ?? null;
-      console.log('[AuthProvider] getSession result:', session);
+      // [PRODUCTION] Do not log session/user info. Commented for production safety.
+      // console.log('[AuthProvider] getSession result:', session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
     // Listen for auth state changes
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      // [PRODUCTION] Do not log session/event info. Commented for production safety.
       // console.log('[AuthProvider] onAuthStateChange event:', event, 'session:', session);
       setUser(session?.user ?? null);
       // Debug: Check SecureStore for Supabase token after auth event

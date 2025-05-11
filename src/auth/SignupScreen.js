@@ -6,6 +6,9 @@ import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity } from 'rea
 import { supabase } from '../services/supabaseClient';
 
 export default function SignupScreen({ onSwitchScreen = () => {} }) {
+  // All profile creation should be backend only as of 2025-05-03
+  // (If you see a profile insert log here, something is wrong)
+  // Double-check: No frontend profile insert logic should exist.
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,19 +18,15 @@ export default function SignupScreen({ onSwitchScreen = () => {} }) {
   const handleSignup = async () => {
     setLoading(true);
     setError('');
+    // console.log('[SignupScreen] Starting signup for:', email);
     const { data, error } = await supabase.auth.signUp({ email, password });
+    // console.log('[SignupScreen] Signup result:', { data, error });
     if (error) {
       setError(error.message);
     } else if (data && data.user) {
-      // Create profile row in Supabase
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{ id: data.user.id }]);
-      if (profileError) {
-        setError('Signup succeeded, but failed to create profile: ' + profileError.message);
-      } else {
-        setSuccess(true);
-      }
+      // Profile creation is now handled by a backend trigger. No frontend insert should occur.
+      // console.log('[SignupScreen] Signup success, user:', data.user.id);
+      setSuccess(true);
     }
     setLoading(false);
   };
@@ -41,7 +40,7 @@ export default function SignupScreen({ onSwitchScreen = () => {} }) {
       setResendLoading(true);
       setResendMessage('');
       try {
-        // Supabase JS v2 does not have a direct resend method, so we re-call signUp
+        // Supabase JS v2 does not have a direct resend method, so we re-call signUp. No profile insert should occur here.
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) {
           setResendMessage(error.message);

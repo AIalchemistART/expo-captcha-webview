@@ -5,7 +5,7 @@ import MysticalHomeBackground from '../components/MysticalHomeBackground';
 import DivineInspirationInfoOverlay from '../components/DivineInspirationInfoOverlay';
 import DivineInspirationPremiumOverlay from '../components/DivineInspirationPremiumOverlay';
 import { useAuth } from '../auth/useAuth';
-const { useProfile } = require('../auth/useProfile');
+import { useProfile } from '../auth/ProfileProvider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScrollWornEdgesCommentary from '../components/ScrollWornEdgesCommentary';
 import GoldBubbleBackground from '../components/GoldBubbleBackground';
@@ -33,7 +33,11 @@ function getRandomPassage() {
   return { book, chapter, startVerse, endVerse };
 }
 
+import { useRoute } from '@react-navigation/native';
+
 const DivineInspirationScreen = ({ navigation }) => {
+  const route = useRoute();
+
   // Auth and profile
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -61,6 +65,16 @@ const DivineInspirationScreen = ({ navigation }) => {
     refresh,
     refreshFromGlobal,
   } = useRandomPassageCommentary();
+
+  // Auto-trigger Get Inspired if navigated with param (e.g., from notification)
+  React.useEffect(() => {
+    if (route?.params?.autoInspire) {
+      console.log('[DivineInspirationScreen] autoInspire param detected, running getNewPassage()');
+      getNewPassage();
+      // Reset param to avoid duplicate triggers
+      navigation.setParams({ autoInspire: false });
+    }
+  }, [route?.params?.autoInspire]);
 
   // --- Dynamic collision logic for invocation/illumination card ---
   const { height } = require('react-native').useWindowDimensions();
@@ -136,7 +150,7 @@ const DivineInspirationScreen = ({ navigation }) => {
       {passage && (
         <View style={[styles.invocationCard, styles.contentSpacing, { maxHeight, minHeight, marginTop: reservedTop }]} onLayout={e => {
           const { x, y, width, height } = e.nativeEvent.layout;
-          console.log('[DIscreen] invocationCard layout:', { x, y, width, height });
+          // console.log('[DIscreen] invocationCard layout:', { x, y, width, height });
         }}>
           {/* Parent container for invocation card and GMI button; add onLayout for logging */}
           <ScrollView
@@ -162,10 +176,12 @@ const DivineInspirationScreen = ({ navigation }) => {
         <GetInspiredRadioButton
           selected={!passage && !commentary && !commentaryLoading}
           onPress={() => {
-            if (isPremium) {
+            if (!isLoggedIn) {
+              setShowInfoOverlay(true); // Prompt login/signup overlay
+            } else if (isPremium) {
               getNewPassage();
             } else {
-              setShowPremiumOverlay(true);
+              setShowPremiumOverlay(true); // Prompt upgrade overlay
             }
           }}
           loading={commentaryLoading}

@@ -1,26 +1,46 @@
+import * as Sentry from 'sentry-expo';
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import MysticalHomeBackground from '../components/MysticalHomeBackground';
 import { supabase } from '../services/supabaseClient';
+import PasswordResetSentOverlay from '../components/PasswordResetSentOverlay';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [showSentOverlay, setShowSentOverlay] = useState(false);
 
   const handleForgot = async () => {
     setLoading(true);
     setError('');
     setMessage('');
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // Pass the deep link for password reset
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://aialchemistart.github.io/expo-captcha-webview/reset-redirect.html',
+    });
     if (error) {
       setError(error.message);
     } else {
-      setMessage('Password reset email sent! Please check your inbox.');
+      setShowSentOverlay(true);
+      setMessage(''); // Clear old message
     }
     setLoading(false);
   };
+
+  // Wrap unexpected errors in Sentry
+  const handleForgotWithSentry = async () => {
+    try {
+      await handleForgot();
+    } catch (e) {
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+        Sentry.captureException(e);
+      }
+      setError('Unexpected error: ' + (e.message || e.toString()));
+      setLoading(false);
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -34,12 +54,9 @@ export default function ForgotPasswordScreen({ navigation }) {
         onChangeText={setEmail}
         keyboardType="email-address"
       />
+      {/* Password Reset Sent Overlay */}
+      <PasswordResetSentOverlay visible={showSentOverlay} onClose={() => setShowSentOverlay(false)} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {message ? (
-        <View style={styles.mysticalSuccessBanner}>
-          <Text style={styles.mysticalSuccessText}>{message}</Text>
-        </View>
-      ) : null}
       <TouchableOpacity
         style={[styles.mysticalButton, loading && styles.mysticalButtonDisabled]}
         onPress={handleForgot}

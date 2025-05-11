@@ -50,7 +50,7 @@ export default function DivineInspirationPremiumOverlay({ visible, onSignIn, onU
             fontWeight: '600',
             fontFamily: 'serif',
           }}>
-            Get unlimited mystical inspiration, commentary, and journaling features by upgrading to premium!
+            Get unlimited mystical inspiration, commentary, journaling features, and musical meditations by upgrading to premium!
           </Text>
           <View style={{ marginBottom: 18, marginTop: 2, width: '100%' }}>
             <Text style={{ fontSize: 15, color: '#4b3ca7', textAlign: 'left', fontFamily: 'serif', marginBottom: 8 }}>
@@ -60,7 +60,7 @@ export default function DivineInspirationPremiumOverlay({ visible, onSignIn, onU
               • Save and revisit your favorite inspirations in the Journal
             </Text>
             <Text style={{ fontSize: 15, color: '#4b3ca7', textAlign: 'left', fontFamily: 'serif', marginBottom: 8 }}>
-              • Early access to new features & premium content
+              • Full access to new features & premium content
             </Text>
             <Text style={{ fontSize: 15, color: '#4b3ca7', textAlign: 'left', fontFamily: 'serif' }}>
               • Support the vision of mystical, alchemical Bible study

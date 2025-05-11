@@ -31,6 +31,8 @@ export default function BookmarkToggle({ anchor, commentary = '', commentaryId =
   useEffect(() => {
     let isMounted = true;
     async function checkPersistedBookmark() {
+  // [PRODUCTION] Do not log anchor or sensitive info. Commented for production safety.
+// console.log('[BookmarkToggle][LOG] checkPersistedBookmark received anchor:', anchor);
       if (!anchor) {
         setBookmarked(false);
         setBookmarkId(null);
@@ -52,12 +54,12 @@ export default function BookmarkToggle({ anchor, commentary = '', commentaryId =
           setBookmarked(true);
           setBookmarkId(match.id);
           setError(null);
-          // console.log('[BookmarkToggle] Persistent bookmark found:', match);
+          // // console.log('[BookmarkToggle] Persistent bookmark found:', match);
         } else if (isMounted) {
           setBookmarked(false);
           setBookmarkId(null);
           setError(null);
-          // console.log('[BookmarkToggle] No persistent bookmark for anchor:', anchor);
+          // // console.log('[BookmarkToggle] No persistent bookmark for anchor:', anchor);
         }
       } catch (err) {
         if (isMounted) {
@@ -65,7 +67,7 @@ export default function BookmarkToggle({ anchor, commentary = '', commentaryId =
           setBookmarkId(null);
           setError('Failed to fetch bookmarks: ' + err.message);
         }
-        console.error('[BookmarkToggle] Persistent check error:', err);
+        if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[BookmarkToggle] Persistent check error:', err);
       }
       setLoading(false);
     }
@@ -75,6 +77,8 @@ export default function BookmarkToggle({ anchor, commentary = '', commentaryId =
 
 
   const handleToggle = async () => {
+  // [PRODUCTION] Do not log anchor or sensitive info. Commented for production safety.
+// console.log('[BookmarkToggle][LOG] handleToggle received anchor:', anchor);
     if (loading || !anchor) return;
     // Premium gating logic
     if (!isPremium && isAllowedFree && typeof onPremiumBlock === 'function') {
@@ -89,7 +93,7 @@ export default function BookmarkToggle({ anchor, commentary = '', commentaryId =
         setBookmarked(false);
         setBookmarkId(null);
         onChange && onChange(false, null);
-        // console.log('[BookmarkToggle] Bookmark removed:', bookmarkId);
+        // // console.log('[BookmarkToggle] Bookmark removed:', bookmarkId);
       } else {
         // Check for existing bookmark BEFORE adding
         const bookmarks = await fetchBookmarks();
@@ -108,10 +112,10 @@ export default function BookmarkToggle({ anchor, commentary = '', commentaryId =
           setBookmarked(true);
           setBookmarkId(match.id);
           onChange && onChange(true, match.id);
-          console.log('[BookmarkToggle] Bookmark updated:', match.id);
+          // console.log('[BookmarkToggle] Bookmark updated:', match.id);
         } else {
           // No bookmark exists: add new
-          console.log('[BookmarkToggle] Adding bookmark for BibleScreen with anchor: null, book:', anchor?.book, 'chapter:', anchor?.chapter, 'startVerse:', anchor?.startVerse, 'endVerse:', anchor?.endVerse, 'commentaryId:', commentaryId);
+          // console.log('[BookmarkToggle] Adding bookmark for BibleScreen with anchor: null, book:', anchor?.book, 'chapter:', anchor?.chapter, 'startVerse:', anchor?.startVerse, 'endVerse:', anchor?.endVerse, 'commentaryId:', commentaryId);
           // If anchor includes anchorVerse, use it directly for DI; for BibleScreen use referenceFields
           let bm;
           if (anchor && anchor.anchorVerse) {
@@ -127,12 +131,12 @@ export default function BookmarkToggle({ anchor, commentary = '', commentaryId =
           setBookmarked(true);
           setBookmarkId(bm.id);
           onChange && onChange(true, bm.id);
-          // console.log('[BookmarkToggle] Bookmark added:', bm);
+          // // console.log('[BookmarkToggle] Bookmark added:', bm);
         }
       }
     } catch (err) {
       setError('Bookmark error: ' + err.message);
-      console.error('[BookmarkToggle] handleToggle error:', err);
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[BookmarkToggle] handleToggle error:', err);
     }
     setLoading(false);
   };

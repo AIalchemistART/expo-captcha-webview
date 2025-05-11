@@ -1,10 +1,11 @@
+import * as Sentry from 'sentry-expo';
 // Login screen UI (to be implemented)
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity } from 'react-native';
 import { supabase } from '../services/supabaseClient';
 
 import { useAuth } from './useAuth';
-import { useProfile } from './useProfile';
+import { useProfile } from './ProfileProvider';
 
 export default function LoginScreen({ onSwitchScreen = () => {}, navigation }) {
   const [email, setEmail] = useState('');
@@ -23,8 +24,9 @@ export default function LoginScreen({ onSwitchScreen = () => {}, navigation }) {
     setLoading(true);
     setError('');
     try {
+      // console.log('[LoginScreen] Attempting login for:', email);
       const result = await supabase.auth.signInWithPassword({ email, password });
-      // console.log('SUPABASE LOGIN RESULT:', result);
+      // console.log('[LoginScreen] Login result:', result);
       const { error, data } = result;
       if (error) {
         setError(error.message);
@@ -33,31 +35,44 @@ export default function LoginScreen({ onSwitchScreen = () => {}, navigation }) {
       } else {
         // Force session refresh and update context
         const sessionResult = await supabase.auth.getSession();
-        setUser(sessionResult.data.session?.user ?? null);
-        // Fetch user profile from Supabase
-        try {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-          if (profileError) {
-            console.warn('Failed to fetch user profile:', profileError.message);
-          } else {
-            setProfile(profile); // Store profile globally for premium gating
-            // console.log('Fetched user profile:', profile);
+        const sessionUser = sessionResult?.data?.session?.user;
+        setUser(sessionUser);
+        // Fetch profile from Supabase (no insert, only select)
+        if (sessionUser) {
+          try {
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', sessionUser.id)
+              .single();
+            if (profileError) {
+              setError('Failed to fetch profile: ' + profileError.message);
+            } else {
+              setProfile(profile); // Store profile globally for premium gating
+            }
+          } catch (e) {
+            if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+              Sentry.captureException(e);
+            }
+            if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[LoginScreen] Unexpected error fetching profile:', e);
           }
-        } catch (e) {
-          console.error('Unexpected error fetching profile:', e);
         }
       }
     } catch (e) {
-      setError('Unexpected error: ' + (e.message || e.toString()));
-      console.error('SUPABASE LOGIN ERROR:', e);
+      let errMsg = 'Unexpected error';
+      if (e && typeof e === 'object') {
+        errMsg += ': ' + (e.message || e.toString());
+      } else if (typeof e !== 'undefined') {
+        errMsg += ': ' + String(e);
+      }
+      setError(errMsg);
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+        Sentry.captureException(e);
+      }
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[LoginScreen] SUPABASE LOGIN ERROR:', e);
     }
     setLoading(false);
   };
-
 
   // Forgot password handler
   const handleForgot = async () => {

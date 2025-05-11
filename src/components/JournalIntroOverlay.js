@@ -17,15 +17,19 @@ export default function JournalIntroOverlay({ visible, onDismiss, isAuthenticate
 
   const handleToggle = async (value) => {
     setDontShowAgain(value);
-    await AsyncStorage.setItem(INTRO_KEY, value ? 'true' : '');
+    // Set dismissal key immediately when toggled on, clear when toggled off
+    if (value) {
+      await AsyncStorage.setItem(INTRO_KEY, 'true');
+    } else {
+      await AsyncStorage.removeItem(INTRO_KEY);
+    }
   };
 
-  const handleDismiss = async () => {
-    if (dontShowAgain) {
-      await AsyncStorage.setItem(INTRO_KEY, 'true');
-    }
+  const handleDismiss = () => {
+    // No need to set AsyncStorage again, already set by toggle
     onDismiss();
   };
+
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
@@ -37,10 +41,10 @@ export default function JournalIntroOverlay({ visible, onDismiss, isAuthenticate
             The Journal tab lets you record spiritual insights, mystical experiences, and personal reflections as you explore the Bible. 
           </Text>
           <Text style={[styles.body, { textAlign: 'left', alignSelf: 'stretch', marginBottom: 10 }]}> 
-            <Text style={styles.gold}>Free users</Text> can save notes and revisit them anytime.
+            <Text style={styles.gold}>Free users</Text> can sign up to save notes and revisit them anytime.
           </Text>
           <Text style={[styles.body, { textAlign: 'left', alignSelf: 'stretch' }]}> 
-            <Text style={styles.gold}>Premium users</Text> unlock unlimited mystical commentary, bookmarks, and exclusive features to deepen your journey.
+            <Text style={styles.gold}>Premium users</Text> unlock unlimited mystical commentary, bookmarks, musical meditations, and exclusive features to deepen your journey.
           </Text>
           {!isPremium && (
             <TouchableOpacity

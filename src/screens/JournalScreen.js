@@ -1,3 +1,4 @@
+import * as Sentry from 'sentry-expo';
 import React, { useState } from 'react';
 
 import { StatusBar } from 'expo-status-bar';
@@ -22,7 +23,7 @@ import JournalLoadingSpinner from '../components/JournalLoadingSpinner';
 import { useRef, useEffect } from 'react';
 import JournalIntroOverlay from '../components/JournalIntroOverlay';
 import { useAuth } from '../auth/useAuth';
-import { useProfile } from '../auth/useProfile';
+import { useProfile } from '../auth/ProfileProvider';
 import { fetchNotes, addNote, updateNote, deleteNote } from '../services/notes';
 
 const JournalScreen = ({ navigation }) => {
@@ -33,17 +34,21 @@ const JournalScreen = ({ navigation }) => {
   const isPremium = !!profile?.is_paid;
 
   // Journal Intro Overlay state
-  const [showJournalIntro, setShowJournalIntro] = useState(
-    !isPremium && (typeof isPremium === 'boolean') // Only show if not premium (and we know the status)
-  );
+  const [showJournalIntro, setShowJournalIntro] = useState(false);
 
-  // Show overlay only for unauthenticated or authenticated free users
+  // Show overlay only for unauthenticated or authenticated free users, and only if not dismissed
   useEffect(() => {
-    if (isPremium) {
-      setShowJournalIntro(false);
-    } else if (!isPremium) {
-      setShowJournalIntro(true);
-    }
+    let mounted = true;
+    const checkDismissed = async () => {
+      if (isPremium) {
+        if (mounted) setShowJournalIntro(false);
+        return;
+      }
+      const val = await AsyncStorage.getItem('mbc_journal_intro_dismissed_v1');
+      if (mounted) setShowJournalIntro(val !== 'true');
+    };
+    checkDismissed();
+    return () => { mounted = false; };
   }, [isPremium]);
 
   // Handlers for overlay actions
@@ -140,6 +145,9 @@ const JournalScreen = ({ navigation }) => {
       setNotes(prev => [newNote, ...prev]);
     } catch (err) {
       setNotesError(err.message || 'Failed to add note');
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+        Sentry.captureException(err);
+      }
     }
   };
 
@@ -152,6 +160,9 @@ const JournalScreen = ({ navigation }) => {
       closeModal();
     } catch (err) {
       setNotesError(err.message || 'Failed to update note');
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+        Sentry.captureException(err);
+      }
     }
   };
 
@@ -163,35 +174,34 @@ const JournalScreen = ({ navigation }) => {
       closeModal(); // Close overlay after delete
     } catch (err) {
       setNotesError(err.message || 'Failed to delete note');
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+        Sentry.captureException(err);
+      }
     }
   };
 
   // Modal handlers
   // Open note modal, queue if modal is still closing
   const openNoteModal = (noteObj) => {
-    console.log(`[openNoteModal] called at ${new Date().toISOString()}`);
-    console.trace();
+    // [PRODUCTION] Commented out for production safety. Enable only for debugging.
+// console.trace();
     if (modalVisible || isClosing.current || showModalComponent) {
-      console.log('[openNoteModal] Modal already open or closing. Queuing note:', noteObj);
       setPendingNote(noteObj);
       return;
     }
     setModalInstanceKey(k => k + 1);
-    console.log('[openNoteModal] Opening modal for note:', noteObj);
     setSelectedNote(noteObj);
     setIsEditing(false);
     setShowModalComponent(true);
     setTimeout(() => {
-      console.log('[openNoteModal] Setting modalVisible=true');
       setModalVisible(true);
     }, 10);
   };
   // Close modal, but only clear state in onDismiss
   const closeModal = () => {
-    console.log(`[closeModal] called at ${new Date().toISOString()}`);
-    console.trace();
+    // [PRODUCTION] Commented out for production safety. Enable only for debugging.
+// console.trace();
     if (!modalVisible) {
-      console.log('[closeModal] Modal already not visible. Returning.');
       return;
     }
     setModalInstanceKey(k => k + 1);
@@ -199,32 +209,25 @@ const JournalScreen = ({ navigation }) => {
     setModalVisible(false);
     setIsEditing(false);
     setTimeout(() => {
-      console.log('[closeModal] setShowModalComponent(false) and isClosing.current = false');
       setShowModalComponent(false);
       isClosing.current = false;
     }, 350); // Allow animation to finish before unmount
   };
-
 
   // Fix: After drag/drop, forcibly close modal if open (prevents unresponsive overlay) and always increment modalKey
   React.useEffect(() => {
     if (modalVisible) {
       const noteTimestamps = notes.map(n => n.timestamp).join(',');
       if (openNoteModal._lastNoteTimestamps && openNoteModal._lastNoteTimestamps !== noteTimestamps) {
-        console.log('[JournalScreen] Notes changed (drag/drop) while modal open. Forcibly closing modal and remounting to avoid overlay bug.');
         closeModal();
         setModalKey(k => k + 1);
       }
       openNoteModal._lastNoteTimestamps = noteTimestamps;
     }
-    console.log('[JournalScreen][useEffect][notes,modalVisible] modalVisible:', modalVisible, 'selectedNote:', selectedNote, 'isEditing:', isEditing, 'notes:', notes);
   }, [notes, modalVisible]);
   const handleEdit = () => {
-    console.log('[JournalScreen][handleEdit] called');
-    console.log('[JournalScreen][handleEdit][STACK]', new Error().stack);
     setIsEditing(true);
     setTimeout(() => {
-      console.log('[JournalScreen][handleEdit][AFTER] isEditing:', isEditing);
     }, 0);
   };
 
@@ -258,7 +261,6 @@ const JournalScreen = ({ navigation }) => {
           onDelete={selectedNote && !isEditing ? handleDeleteNote : undefined}
         />
       )}
-      {console.log('[JournalScreen][RENDER] GlobalNoteModal props:', {modalVisible, selectedNote, isEditing})}
       <MysticalHomeBackground />
       <StatusBar style="light" backgroundColor="transparent" translucent={true} />
       <View style={{ flex: 1, width: '100%', flexDirection: 'column' }}>

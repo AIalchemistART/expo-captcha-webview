@@ -1,3 +1,4 @@
+import * as Sentry from 'sentry-expo';
 // Button to log out the current user
 import React from 'react';
 import { Button } from 'react-native';
@@ -11,7 +12,10 @@ export default function LogoutButton({ navigation }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('Logout error:', error.message);
+        if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+        Sentry.captureException(error);
+      }
+      // console.error('Logout error:', error.message);
         // Optionally, show a UI error message here
       }
       setUser(null); // Clear user context
@@ -19,7 +23,10 @@ export default function LogoutButton({ navigation }) {
         navigation.navigate('Login');
       }
     } catch (e) {
-      console.error('Unexpected logout error:', e);
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+      Sentry.captureException(e);
+    }
+    // console.error('Unexpected logout error:', e);
     }
   };
   return <Button title="Logout" onPress={handleLogout} />;

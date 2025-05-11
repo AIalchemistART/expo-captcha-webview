@@ -33,7 +33,7 @@ export async function addBookmark(anchor, commentary_id = null, note = '', fromB
     .eq('end_verse', end_verse)
     .maybeSingle();
   if (fetchError) {
-    console.error('[addBookmark] Error checking for existing bookmark:', fetchError);
+    if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[addBookmark] Error checking for existing bookmark:', fetchError);
     throw fetchError;
   }
   if (existing) {
@@ -51,7 +51,7 @@ export async function addBookmark(anchor, commentary_id = null, note = '', fromB
       // Do not update created_at
     };
     const updated = await updateBookmark(existing.id, updateFields);
-    // console.log('[addBookmark] Updated existing bookmark:', updated);
+    // // console.log('[addBookmark] Updated existing bookmark:', updated);
     return updated;
   } else {
     // Insert new bookmark
@@ -61,10 +61,10 @@ export async function addBookmark(anchor, commentary_id = null, note = '', fromB
       .select()
       .single();
     if (error) {
-      console.error('[addBookmark] Supabase error:', error);
+      if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[addBookmark] Supabase error:', error);
       throw error;
     }
-    // console.log('[addBookmark] Inserted new:', data);
+    // // console.log('[addBookmark] Inserted new:', data);
     return data;
   }
 }
@@ -82,7 +82,7 @@ export async function updateBookmark(id, fields) {
     .select()
     .single();
   if (error) {
-    console.error('[updateBookmark] Supabase error:', error);
+    if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[updateBookmark] Supabase error:', error);
     throw error;
   }
   return data;
@@ -92,17 +92,17 @@ export async function updateBookmark(id, fields) {
 export async function deleteBookmark(id) {
   const user_id = await getUserId();
   if (!user_id) throw new Error('Bookmarks are a premium feature. Please sign in and upgrade to premium to save bookmarks.');
-  console.log('[deleteBookmark] deleting:', { id, user_id });
+  // console.log('[deleteBookmark] deleting:', { id, user_id });
   const { error } = await supabase
     .from('bookmarks')
     .delete()
     .eq('id', id)
     .eq('user_id', user_id);
   if (error) {
-    console.error('[deleteBookmark] Supabase error:', error);
+    if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[deleteBookmark] Supabase error:', error);
     throw error;
   }
-  console.log('[deleteBookmark] Deleted:', id);
+  // console.log('[deleteBookmark] Deleted:', id);
 }
 
 // Fetch all bookmarks for the current user
@@ -115,10 +115,10 @@ export async function fetchBookmarks() {
     .eq('user_id', user_id)
     .order('created_at', { ascending: false });
   if (error) {
-    console.error('[fetchBookmarks] Supabase error:', error);
+    if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.error('[fetchBookmarks] Supabase error:', error);
     throw error;
   }
-  // console.log('[fetchBookmarks] found:', data?.length || 0);
+  // // console.log('[fetchBookmarks] found:', data?.length || 0);
   return data || [];
 }
 

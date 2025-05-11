@@ -13,7 +13,7 @@ export default function NotesAuthGate({ visible, onLoginPress, onDismiss }) {
         <View style={styles.card}>
           <Text style={styles.title}>Create an Account to Save Notes</Text>
           <Text style={styles.body}>
-            Note-taking is a free feature, but you need to sign up or log in to keep your notes private and secure.
+            Note-taking is a free feature, but you need to sign up or log in to privately and securely save your notes.
           </Text>
           <TouchableOpacity style={styles.button} onPress={onLoginPress}>
             <Text style={styles.buttonText}>Sign Up / Log In</Text>

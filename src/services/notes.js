@@ -4,10 +4,10 @@ import { supabase } from './supabaseClient';
 export async function getUserId() {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data?.user) {
-    console.warn('[getUserId] No authenticated user.', error);
+    if (typeof Sentry !== 'undefined' && Sentry.captureException) { Sentry.captureException(); } // console.warn('[getUserId] No authenticated user.', error);
     return null;
   }
-  console.log('[getUserId] user.id:', data.user.id);
+  // console.log('[getUserId] user.id:', data.user.id);
   return data.user.id;
 }
 
@@ -23,20 +23,20 @@ export async function fetchNotes() {
 
 // Add a new note
 export async function addNote(note, selection) {
-  console.log('[addNote] called with:', { note, selection });
+  // console.log('[addNote] called with:', { note, selection });
   // Get current user (SDK v2+)
   const {
     data: { user },
     error: userError
   } = await supabase.auth.getUser();
-  console.log('[addNote] user:', user, 'userError:', userError);
+  // console.log('[addNote] user:', user, 'userError:', userError);
   if (userError || !user) {
     console.error('[addNote] No authenticated user.');
     throw new Error('User must be authenticated to save notes');
   }
 
   const insertObj = { note, selection, user_id: user.id };
-  console.log('[addNote] inserting:', insertObj);
+  // console.log('[addNote] inserting:', insertObj);
   const { data, error } = await supabase
     .from('notes')
     .insert([insertObj])
@@ -46,7 +46,7 @@ export async function addNote(note, selection) {
     console.error('[addNote] Supabase error:', error);
     throw error;
   }
-  console.log('[addNote] Inserted note:', data);
+  // console.log('[addNote] Inserted note:', data);
   return data;
 }
 

@@ -34,10 +34,10 @@ export default function BibleIntroOverlay({
           <MaterialCommunityIcons name="book-open-variant" size={44} color="#bfae66" style={{ marginBottom: 8 }} />
           <Text style={styles.title}>Welcome to the Bible Tab</Text>
           <Text style={styles.body}>
-            Explore the entire Bible, journal your spiritual journey, and receive mystical commentary on <Text style={styles.gold}>Genesis 1</Text> & <Text style={styles.gold}>Matthew 1</Text>—all for free.
+            Explore the entire Bible, journal your spiritual journey, listen to and download musical meditations, and receive mystical commentary on <Text style={styles.gold}>Genesis 1</Text> & <Text style={styles.gold}>Matthew 1</Text>—all for free.
           </Text>
-          <Text style={[styles.body, { textAlign: 'left', alignSelf: 'stretch', marginBottom: 10 }]}> 
-            <Text style={styles.gold}>Upgrade to Premium</Text> for unlimited mystical interpretations, bookmarking, and exclusive features to deepen your study.
+          <Text style={[styles.body, { textAlign: 'center', alignSelf: 'stretch', marginBottom: 10 }]}> 
+            <Text style={styles.gold}>Upgrade to Premium</Text> for unlimited mystical interpretations, bookmarking, musical meditations,and exclusive features to deepen your study.
           </Text>
           <View style={styles.ctaRow}>
             {!isLoggedIn ? (

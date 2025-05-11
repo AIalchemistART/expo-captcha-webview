@@ -31,9 +31,8 @@ export default function MysticalAuthGate({ visible, onLoginPress, onUpgradePress
             <Text style={styles.bullet}>• Unlock unlimited mystical commentary</Text>
             <Text style={styles.bullet}>• Sync insights across devices</Text>
             <Text style={styles.bullet}>• Keep your spiritual journey private and secure</Text>
-            <Text style={styles.bullet}>• Priority access to new features</Text>
-            <Text style={styles.bullet}>• Daily mystical meditations</Text>
-            <Text style={styles.bullet}>• Early access to new features</Text>
+            <Text style={styles.bullet}>• Full access to new features</Text>
+            <Text style={styles.bullet}>• Full collection of myusical meditations</Text>
             <Text style={[styles.bullet, { marginBottom: 22 }]}>• Priority support & feedback</Text>
             <Text style={styles.body}>
               Upgrade to Premium for unlimited mystical interpretations, exclusive spiritual tools, and a richer mystical experience!
