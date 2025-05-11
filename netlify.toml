@@ -1,5 +1,5 @@
 [build]
-  publish = "dist"
+  publish = "/"
   command = "echo 'No static build step configured.'"
 
 [dev]
